@@ -1,0 +1,203 @@
+---
+- name: Ultieme Nordic i3wm Master Setup
+  hosts: localhost
+  connection: local
+  become: yes
+
+  vars:
+    # Nord Kleurenpalet
+    nord0:  "#2e3440" # Achtergrond
+    nord1:  "#3b4252" # Statusbalken / Panelen
+    nord2:  "#434c5e" # Selectie / Focus achtergrond
+    nord3:  "#4c566a" # Grijze tekst
+    nord4:  "#d8dee9" # Sneeuwwitte tekst
+    nord8:  "#88c0d0" # Ijsblauw (Accent & Focus border)
+    nord10: "#5e81ac" # Donkerblauw (Indicator)
+
+  tasks:
+    - name: 1. Installeer alle Systeem Pakketten
+      apt:
+        name:
+          - i3-wm
+          - kitty
+          - tmux
+          - falkon
+          - polybar
+          - rofi
+          - picom
+          - feh
+          - dunst
+          - light
+          - fonts-jetbrains-mono
+          - x11-xserver-utils
+          - pavucontrol
+        state: present
+        update_cache: yes
+
+    - name: 2. Installeer JetBrainsMono Nerd Font (Icoontjes)
+      get_url:
+        url: https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/JetBrainsMono/Ligatures/Regular/JetBrainsMonoNerdFont-Regular.ttf
+        dest: /usr/local/share/fonts/JetBrainsMonoNerdFont-Regular.ttf
+        mode: '0644'
+
+    - name: 3. Maak Configuratie Mappen aan
+      become: no
+      file:
+        path: "~/.config/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop: [i3, polybar, rofi, picom, kitty, falkon, dunst]
+
+    - name: 4. Falkon Tuning (Startpage, AdBlock & Ultra-Light)
+      become: no
+      copy:
+        dest: "~/.config/falkon/settings.ini"
+        content: |
+          [Web-Browsing]
+          EnableSmoothScrolling=false
+          AnimateScrolling=false
+          WebAttributes\WebGLEnabled=true
+          WebAttributes\Accelerated2dCanvasEnabled=true
+          DoNotTrack=true
+          [AdBlock]
+          Enabled=true
+          UseEmbeddedAbp=true
+          UpdateInterval=7
+          [Network]
+          DiskCacheSize=20
+          AllowLocalCache=false
+          [Privacy]
+          DeleteCookiesOnExit=true
+          DeleteHistoryOnExit=true
+          SendDoNotTrack=true
+          [NavigationBar]
+          DefaultSearchEngine=Startpage
+          ShowSearchBar=false
+          showSuggestions=0
+
+    - name: 5. Configureer i3 (Nord Stijl & Workflow)
+      become: no
+      copy:
+        dest: "~/.config/i3/config"
+        content: |
+          set $mod Mod4
+          font pango:JetBrainsMono Nerd Font 10
+
+          # Nord Vensterkleuren
+          # class                 border    backgr    text    indicator child_border
+          client.focused          {{ nord8 }} {{ nord8 }} {{ nord0 }} {{ nord10 }} {{ nord8 }}
+          client.focused_inactive {{ nord1 }} {{ nord1 }} {{ nord4 }} {{ nord1 }}  {{ nord1 }}
+          client.unfocused        {{ nord0 }} {{ nord0 }} {{ nord4 }} {{ nord0 }}  {{ nord0 }}
+
+          # Workspaces & App Assigns
+          set $ws1 "1: 󰖟 Web"
+          set $ws2 "2: 󰆍 Term"
+          assign [class="Falkon"] $ws1
+          assign [class="kitty"] $ws2
+
+          # Autostart
+          exec --no-startup-id picom -b
+          exec --no-startup-id ~/.config/polybar/launch.sh
+          exec_always --no-startup-id feh --bg-scale --randomize /usr/share/backgrounds/*
+          exec --no-startup-id falkon
+          exec --no-startup-id kitty
+
+          # Snelkoppelingen
+          bindsym $mod+Return exec kitty
+          bindsym $mod+w exec falkon
+          bindsym $mod+d exec rofi -show drun
+          bindsym $mod+Shift+q kill
+          bindsym $mod+Shift+r restart
+          bindsym $mod+Shift+e exec i3-msg exit
+
+          # Gaps & Borders
+          gaps inner 8
+          smart_gaps on
+          new_window pixel 2
+
+          # Media Keys
+          bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +5%
+          bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -5%
+          bindsym XF86MonBrightnessUp exec --no-startup-id light -A 5
+          bindsym XF86MonBrightnessDown exec --no-startup-id light -U 5
+
+    - name: 6. Configureer Kitty & Tmux (Nord Integratie)
+      become: no
+      copy:
+        dest: "{{ item.dest }}"
+        content: "{{ item.content }}"
+      loop:
+        - dest: "~/.config/kitty/kitty.conf"
+          content: |
+            font_family JetBrainsMono Nerd Font
+            font_size 11.0
+            window_padding_width 12
+            background {{ nord0 }}
+            foreground {{ nord4 }}
+            shell tmux
+        - dest: "~/.tmux.conf"
+          content: |
+            set -g mouse on
+            set -g prefix C-a
+            unbind C-b
+            bind C-a send-prefix
+            set -g status-style bg="{{ nord1 }}",fg="{{ nord4 }}"
+            set -g status-left "#[fg={{ nord0 }},bg={{ nord8 }},bold] #S "
+            set -g status-right "#[fg={{ nord4 }}] %H:%M "
+            bind | split-window -h -c "#{pane_current_path}"
+            bind - split-window -v -c "#{pane_current_path}"
+            set -g default-terminal "xterm-kitty"
+
+    - name: 7. Configureer Polybar (De Balk)
+      become: no
+      copy:
+        dest: "~/.config/polybar/config.ini"
+        content: |
+          [bar/main]
+          width = 100%
+          height = 26
+          background = {{ nord0 }}
+          foreground = {{ nord4 }}
+          font-0 = "JetBrainsMono Nerd Font:size=10;2"
+          modules-left = i3
+          modules-center = date
+          modules-right = cpu memory battery
+          [module/i3]
+          type = internal/i3
+          label-focused = %name%
+          label-focused-background = {{ nord2 }}
+          label-focused-underline = {{ nord8 }}
+          label-focused-padding = 2
+          [module/date]
+          type = internal/date
+          date = " %H:%M "
+          format-foreground = {{ nord8 }}
+
+    - name: 8. Polybar Launch Script
+      become: no
+      copy:
+        dest: "~/.config/polybar/launch.sh"
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          killall -q polybar
+          polybar main &
+
+    - name: 9. Configureer Rofi (Nord Stijl)
+      become: no
+      copy:
+        dest: "~/.config/rofi/config.rasi"
+        content: |
+          configuration { modi: "drun"; show-icons: true; font: "JetBrainsMono Nerd Font 11"; }
+          * { background-color: {{ nord0 }}; text-color: {{ nord4 }}; accent: {{ nord8 }}; }
+          element selected { background-color: @accent; text-color: {{ nord0 }}; }
+
+    - name: 10. Configureer Picom (Performance mode)
+      become: no
+      copy:
+        dest: "~/.config/picom/picom.conf"
+        content: |
+          backend = "xrender";
+          vsync = true;
+          shadow = false;
+          fading = false;
