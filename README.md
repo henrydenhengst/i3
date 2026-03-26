@@ -16,6 +16,9 @@ ansible-playbook setup_i3.yml --ask-become-pass
 ![Shell](https://img.shields.io/badge/Shell-Zsh_&_Starship-black?style=for-the-badge&logo=zsh&logoColor=white&color=81a1c1)
 ![Theme](https://img.shields.io/badge/Theme-Nordic-black?style=for-the-badge&color=4c566a)
 ![DevOps](https://img.shields.io/badge/DevOps-Ready-black?style=for-the-badge&logo=kubernetes&logoColor=white&color=5e81ac)
+![Ansible](https://img.shields.io/badge/Ansible-2.16+-5e81ac?style=for-the-badge&logo=ansible)
+![Virtualization](https://img.shields.io/badge/Vagrant-KVM/Libvirt-88c0d0?style=for-the-badge&logo=vagrant)
+
 
 Dit Ansible playbook bouwt een volledig functioneel DevOps-station met een focus op Sysadmin-workflow en esthetiek.
 
@@ -29,5 +32,5 @@ Dit Ansible playbook bouwt een volledig functioneel DevOps-station met een focus
 * **File Management:** nnn met preview-tui (afbeeldingen/PDF's direct in terminal).
 * **Browser:** Falkon (privacy-tuned) op Workspace 1.
 * **Automatisering:** SSH-Agent auto-start en auto-key-load.
-
+* **Virtualisatie:** Configureert Vagrant met de vederlichte Libvirt/KVM provider (ideaal voor oudere hardware).
 
