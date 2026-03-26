@@ -1,47 +1,44 @@
 ---
-- name: "Nordic DevOps & i3wm Omni-Setup"
+- name: "The Absolute Omni-Protocol: Nord DevOps & Sysadmin Master Setup"
   hosts: localhost
   connection: local
   become: yes
 
   vars:
-    # --- NORD KLEURENPALET (De Heilige Graal) ---
-    nord0:  "#2e3440" # Achtergrond
-    nord1:  "#3b4252" # Statusbalken
-    nord2:  "#434c5e" # Selectie
-    nord3:  "#4c566a" # Grijze tekst
-    nord4:  "#d8dee9" # Sneeuwwitte tekst
-    nord8:  "#88c0d0" # Ijsblauw (Accent)
-    nord10: "#5e81ac" # Indicator
+    # --- NORD KLEURENPALET ---
+    nord0:  "#2e3440" # Background
+    nord1:  "#3b4252" # Statusbars
+    nord8:  "#88c0d0" # Frost Blue (Accent)
+    nord4:  "#d8dee9" # Snow White
 
-    # --- DE VOLLEDIGE TOOLSET (100+ Tools) ---
+    # --- DE VOLLEDIGE TOOLSET (CLI + DEVOPS + GUI) ---
     zsh_power: [zsh, zsh-autosuggestions, zsh-syntax-highlighting, starship, zoxide, fzf]
-    devops_lazy: [kubectl, k9s, kubectx, kubens, helm, lazydocker, terraform, tflint, ansible-lint, stern, dive, azure-cli, awscli]
+    devops_stack: [kubectl, k9s, kubectx, kubens, helm, stern, lazydocker, dive, terraform, tflint, ansible-lint, azure-cli, awscli]
     modern_unix: [bat, eza, ripgrep, fd-find, jq, yq, btop, gping, duf, dust, doggo, curlie, cheat, sd, glances, termshark, nmap, mtr]
     gui_stack: [i3-wm, kitty, tmux, polybar, rofi, picom, feh, dunst, light, pavucontrol, falkon]
-    file_management: [nnn, ranger, mc, lf, ffmpegthumbnailer, mediainfo, imagemagick, poppler-utils, ueberzugpp]
+    preview_deps: [nnn, ranger, mc, ffmpegthumbnailer, mediainfo, imagemagick, poppler-utils, ueberzugpp]
 
   tasks:
-    # --- 1. INSTALLATIE & CORE SYSTEM ---
-    - name: "1. Installeer de volledige Stack (GUI + CLI + DevOps)"
+    # --- 1. CORE INSTALLATIE ---
+    - name: "Installeer de volledige Stack (100+ Tools)"
       apt:
-        name: "{{ zsh_power + devops_lazy + modern_unix + gui_stack + file_management }}"
+        name: "{{ zsh_power + devops_stack + modern_unix + gui_stack + preview_deps }}"
         state: present
         update_cache: yes
 
-    - name: "2. Forceer Zsh als standaard shell"
+    - name: "Stel Zsh in als standaard shell"
       user:
         name: "{{ lookup('env', 'USER') }}"
         shell: /bin/zsh
 
-    - name: "3. Maak alle Config mappen aan"
+    - name: "Maak alle Config Mappen aan"
       become: no
       file:
         path: "~/.config/{{ item }}"
         state: directory
       loop: [i3, polybar, rofi, kitty, nnn, nvim, starship, btop, k9s, ranger, falkon, dunst, picom]
 
-    - name: "4. Installeer JetBrainsMono Nerd Font"
+    - name: "Installeer JetBrainsMono Nerd Font"
       shell: |
         mkdir -p ~/.local/share/fonts
         curl -L https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz | tar --extract --xz -C ~/.local/share/fonts
@@ -50,16 +47,28 @@
       args:
         creates: "~/.local/share/fonts/JetBrainsMonoNerdFont-Regular.ttf"
 
-    # --- 2. GUI CONFIGURATIE (i3, Polybar, Rofi, Falkon, Picom) ---
-    - name: "5. Configureer i3 (Nord Focus & Random Wallpaper)"
+    # --- 2. LEGACY DOTFILE MIGRATIE (Bashrc & Vimrc) ---
+    - name: "Lees huidige .bashrc in (voor aliassen/functies)"
+      slurp:
+        src: "~/.bashrc"
+      register: old_bashrc
+      ignore_errors: yes
+
+    - name: "Lees huidige .vimrc in (voor bindings/macro's)"
+      slurp:
+        src: "~/.vimrc"
+      register: old_vimrc
+      ignore_errors: yes
+
+    # --- 3. GUI CONFIGURATIE (i3, Polybar, Rofi, Falkon, Picom) ---
+    - name: "Configureer i3 (Nord & Random Wallpaper)"
       become: no
       copy:
         dest: "~/.config/i3/config"
         content: |
           set $mod Mod4
           font pango:JetBrainsMono Nerd Font 10
-          client.focused {{ nord8 }} {{ nord8 }} {{ nord0 }} {{ nord10 }} {{ nord8 }}
-          # Gebruik bestaande /usr/share/backgrounds
+          client.focused {{ nord8 }} {{ nord8 }} {{ nord0 }} {{ nord8 }} {{ nord8 }}
           exec_always --no-startup-id feh --bg-scale --randomize /usr/share/backgrounds/*
           exec --no-startup-id picom -b
           exec --no-startup-id ~/.config/polybar/launch.sh
@@ -69,7 +78,7 @@
           gaps inner 8
           new_window pixel 2
 
-    - name: "6. Configureer Polybar & Rofi (Nord)"
+    - name: "Configureer Polybar & Rofi (Nord)"
       become: no
       copy:
         dest: "{{ item.dest }}"
@@ -80,7 +89,7 @@
         - { dest: "~/.config/polybar/config.ini", content: "[bar/main]\nwidth=100%\nheight=26\nbackground={{ nord0 }}\nforeground={{ nord4 }}\nfont-0=\"JetBrainsMono Nerd Font:size=10;2\"\nmodules-left=i3\nmodules-center=date\nmodules-right=cpu memory\n[module/i3]\ntype=internal/i3\nlabel-focused-underline={{ nord8 }}\nlabel-focused-padding=2\n[module/date]\ntype=internal/date\ndate=\" %H:%M \"\nformat-foreground={{ nord8 }}" }
         - { dest: "~/.config/rofi/config.rasi", content: "configuration { modi: \"drun\"; show-icons: true; font: \"JetBrainsMono Nerd Font 11\"; }\n* { background-color: {{ nord0 }}; text-color: {{ nord4 }}; accent: {{ nord8 }}; }\nelement selected { background-color: @accent; text-color: {{ nord0 }}; }" }
 
-    - name: "7. Falkon Sysadmin Tuning (Ultra-Light & Privacy)"
+    - name: "Falkon Sysadmin Tuning (Privacy & Speed)"
       become: no
       copy:
         dest: "~/.config/falkon/settings.ini"
@@ -94,45 +103,8 @@
           [NavigationBar]
           DefaultSearchEngine=Startpage
 
-    # --- 3. SYSADMIN ENGINE (Zsh, Tmux, nnn, Neovim) ---
-    - name: "8. Download Nord Skins (K9s & Btop)"
-      become: no
-      get_url:
-        url: "{{ item.url }}"
-        dest: "{{ item.dest }}"
-      loop:
-        - { url: 'https://raw.githubusercontent.com/derailed/k9s/master/skins/nord.yaml', dest: '~/.config/k9s/skin.yml' }
-        - { url: 'https://raw.githubusercontent.com/aristocratos/btop/main/themes/nord.theme', dest: '~/.config/btop/themes/nord.theme' }
-
-    - name: "9. Configureer Kitty & Tmux (Sysadmin Focus)"
-      become: no
-      copy:
-        dest: "{{ item.dest }}"
-        content: "{{ item.content }}"
-      loop:
-        - dest: "~/.config/kitty/kitty.conf"
-          content: "font_family JetBrainsMono Nerd Font\nbackground {{ nord0 }}\nbackground_opacity 0.92\nshell tmux"
-        - dest: "~/.tmux.conf"
-          content: |
-            set -g default-shell /bin/zsh
-            set -g prefix C-a
-            set -g mouse on
-            set -g base-index 1
-            set -g status-style bg='{{ nord1 }}',fg='{{ nord8 }}'
-            set -g status-left "#[bg={{ nord8 }},fg={{ nord0 }},bold] #S #[default] "
-            set -g status-right "#[fg={{ nord4 }}] ☸ #(kubectl config current-context) %H:%M "
-            # Sysadmin: Sync & Log
-            bind y setw synchronize-panes
-            bind P pipe-pane -o "cat >> ~/#W-tmux.log" \; display "Logging to ~/#W-tmux.log"
-            # Vim Navigatie
-            bind h select-pane -L
-            bind j select-pane -D
-            bind k select-pane -U
-            bind l select-pane -R
-            bind | split-window -h -c "#{pane_current_path}"
-            bind - split-window -v -c "#{pane_current_path}"
-
-    - name: "10. Zshrc - De DevOps Motor (SSH, Plugins, Aliassen)"
+    # --- 4. DE ENGINE (Zsh, Tmux, nnn) ---
+    - name: "Zshrc - De DevOps Motor + Bash Legacy"
       become: no
       blockinfile:
         path: "~/.zshrc"
@@ -141,25 +113,30 @@
           source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
           source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
           export BAT_THEME="Nord"
-          export NNN_FIFO='/tmp/nnn.fifo'
           export NNN_PLUG='p:preview-tui'
           export NNN_PREVIEW_IMGPROG='kitty'
-          export KUBECTX_IGNORE_FZF=0
-          # SSH Auto-Agent
-          if [ -z "$SSH_AUTH_SOCK" ]; then
-             eval `ssh-agent -s`
-             ssh-add ~/.ssh/id_rsa 2>/dev/null
-          fi
-          # DevOps Aliases
+          if [ -z "$SSH_AUTH_SOCK" ]; then eval `ssh-agent -s`; ssh-add ~/.ssh/id_rsa 2>/dev/null; fi
           alias ls='eza --icons --group-directories-first'
           alias k='kubectl'
           alias n='nnn -e'
           alias ldo='lazydocker'
-          alias tf='terraform'
           eval "$(starship init zsh)"
           eval "$(zoxide init zsh)"
+          
+          # --- GEÏMPORTEERD UIT BASHRC ---
+          {{ old_bashrc['content'] | b64decode if old_bashrc['content'] is defined else '# Geen Bashrc gevonden' }}
 
-    - name: "11. Neovim Sysadmin Setup (LSP, Telescope, YAML)"
+    - name: "Kitty & Tmux (Sysadmin Focus)"
+      become: no
+      copy:
+        dest: "{{ item.dest }}"
+        content: "{{ item.content }}"
+      loop:
+        - { dest: "~/.config/kitty/kitty.conf", content: "font_family JetBrainsMono Nerd Font\nbackground {{ nord0 }}\nbackground_opacity 0.92\nshell tmux" }
+        - { dest: "~/.tmux.conf", content: "set -g default-shell /bin/zsh\nset -g prefix C-a\nset -g mouse on\nset -g status-style bg='{{ nord1 }}',fg='{{ nord8 }}'\nset -g status-left \"#[bg={{ nord8 }},fg={{ nord0 }},bold] #S #[default] \"\nset -g status-right \"#[fg={{ nord4 }}] ☸ #(kubectl config current-context) %H:%M \"\nbind y setw synchronize-panes\nbind P pipe-pane -o \"cat >> ~/#W-tmux.log\" \\; display \"Logging to ~/#W-tmux.log\"\nbind h select-pane -L\nbind j select-pane -D\nbind k select-pane -U\nbind l select-pane -R\nbind | split-window -h -c \"#{pane_current_path}\"\nbind - split-window -v -c \"#{pane_current_path}\"" }
+
+    # --- 5. NEVIM (LSP, Nord & Vimrc Legacy) ---
+    - name: "Neovim - Sysadmin IDE + Vimrc Legacy"
       become: no
       copy:
         dest: "~/.config/nvim/init.lua"
@@ -180,8 +157,18 @@
           vim.opt.relativenumber = true
           vim.opt.shiftwidth = 2
           vim.keymap.set('n', '<C-p>', require('telescope.builtin').find_files, {})
+          
+          -- --- GEÏMPORTEERD UIT VIMRC ---
+          vim.cmd([[
+          {{ old_vimrc['content'] | b64decode if old_vimrc['content'] is defined else '" Geen Vimrc gevonden' }}
+          ]])
 
-    - name: "12. Finaliseer nnn & Bat cache"
+    # --- 6. SKINS & FINISHING ---
+    - name: "Download Skins & Finaliseer"
       become: no
-      shell: "curl -Ls https://raw.githubusercontent.com/jarun/nnn/master/plugins/get_plugins | sh && bat cache --build"
+      shell: |
+        curl -Ls https://raw.githubusercontent.com/derailed/k9s/master/skins/nord.yaml > ~/.config/k9s/skin.yml
+        curl -Ls https://raw.githubusercontent.com/aristocratos/btop/main/themes/nord.theme > ~/.config/btop/themes/nord.theme
+        curl -Ls https://raw.githubusercontent.com/jarun/nnn/master/plugins/get_plugins | sh
+        bat cache --build
       changed_when: false
