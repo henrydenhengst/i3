@@ -1,39 +1,40 @@
 ---
-- name: "The God-Mode Nordic DevOps & Sysadmin Master Setup"
+- name: "The Absolute Omni-Protocol: Nord DevOps, Sysadmin & Hybrid Container Master"
   hosts: localhost
   connection: local
   become: yes
 
   vars:
     # --- NORD KLEURENPALET ---
-    nord0:  "#2e3440" 
-    nord1:  "#3b4252" 
-    nord8:  "#88c0d0" 
-    nord4:  "#d8dee9"
+    nord0:  "#2e3440" # Background
+    nord1:  "#3b4252" # Statusbars
+    nord8:  "#88c0d0" # Frost Blue (Accent)
+    nord4:  "#d8dee9" # Snow White
 
-    # --- DE VOLLEDIGE TOOLSET ---
+    # --- VOLLEDIGE TOOLSET ---
     zsh_power: [zsh, zsh-autosuggestions, zsh-syntax-highlighting, starship, zoxide, fzf]
     devops_stack: [kubectl, k9s, kubectx, kubens, helm, stern, lazydocker, dive, terraform, tflint, ansible-lint, azure-cli, awscli]
     modern_unix: [bat, eza, ripgrep, fd-find, jq, yq, btop, gping, duf, dust, doggo, curlie, cheat, sd, glances, termshark, nmap, mtr]
     gui_stack: [i3-wm, kitty, tmux, polybar, rofi, picom, feh, dunst, light, pavucontrol, falkon]
     file_management: [nnn, ranger, mc, lf, ffmpegthumbnailer, mediainfo, imagemagick, poppler-utils, ueberzugpp]
-    # Virtualisatie voor oude laptops (KVM is lichter dan VirtualBox)
-    virtualization: [vagrant, qemu-kvm, libvirt-daemon-system, libvirt-clients, bridge-utils, virt-manager]
+    # Virtualisatie & Light-Containers (Podman naast je bestaande Docker)
+    light_virt: [vagrant, qemu-kvm, libvirt-daemon-system, libvirt-clients, podman, distrobox, buildah, skopeo]
 
   tasks:
     # --- 1. CORE INSTALLATIE ---
-    - name: "1. Installeer de volledige Stack (100+ Tools & Virtualisatie)"
+    - name: "1. Installeer de volledige Stack (100+ Tools & Virt)"
       apt:
-        name: "{{ zsh_power + devops_stack + modern_unix + gui_stack + file_management + virtualization }}"
+        name: "{{ zsh_power + devops_stack + modern_unix + gui_stack + file_management + light_virt }}"
         state: present
         update_cache: yes
 
-    - name: "2. Rechten voor Virtualisatie & Shell"
+    - name: "2. Gebruikersrechten (Shell, Docker, KVM)"
       user:
         name: "{{ lookup('env', 'USER') }}"
         shell: /bin/zsh
-        groups: libvirt,kvm
+        groups: libvirt,kvm,docker
         append: yes
+      ignore_errors: yes
 
     - name: "3. Maak alle Config Mappen aan"
       become: no
@@ -60,7 +61,7 @@
       loop: [/.bashrc, /.vimrc]
 
     # --- 3. GUI CONFIGURATIE (Nordic i3wm) ---
-    - name: "6. Configureer i3 (Nord & Random Wallpaper)"
+    - name: "6. Configureer i3 (Nord Focus & Random Wallpaper)"
       become: no
       copy:
         dest: "~/.config/i3/config"
@@ -87,14 +88,14 @@
         - { dest: "~/.config/polybar/launch.sh", mode: "0755", content: "#!/bin/bash\nkillall -q polybar\npolybar main &" }
         - { dest: "~/.config/polybar/config.ini", content: "[bar/main]\nwidth=100%\nheight=26\nbackground={{ nord0 }}\nforeground={{ nord4 }}\nfont-0=\"JetBrainsMono Nerd Font:size=10;2\"\nmodules-left=i3\nmodules-center=date\nmodules-right=cpu memory\n[module/i3]\ntype=internal/i3\nlabel-focused-underline={{ nord8 }}\nlabel-focused-padding=2\n[module/date]\ntype=internal/date\ndate=\" %H:%M \"\nformat-foreground={{ nord8 }}" }
 
-    - name: "8. Falkon Browser Tuning"
+    - name: "8. Falkon Browser (Privacy & Low-RAM Tuning)"
       become: no
       copy:
         dest: "~/.config/falkon/settings.ini"
         content: "[Web-Browsing]\nEnableSmoothScrolling=false\nDoNotTrack=true\n[AdBlock]\nEnabled=true\n[NavigationBar]\nDefaultSearchEngine=Startpage"
 
     # --- 4. SYSADMIN ENGINE (Zsh, Tmux, Vagrant) ---
-    - name: "9. Zshrc - De DevOps Motor + Bash Legacy"
+    - name: "9. Zshrc - De DevOps Motor + Legacy Bash"
       become: no
       blockinfile:
         path: "~/.zshrc"
@@ -103,18 +104,20 @@
           source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
           source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
           export BAT_THEME="Nord"
-          export NNN_PLUG='p:preview-tui'
           export VAGRANT_DEFAULT_PROVIDER=libvirt
           if [ -z "$SSH_AUTH_SOCK" ]; then eval `ssh-agent -s`; ssh-add ~/.ssh/id_rsa 2>/dev/null; fi
           alias ls='eza --icons --group-directories-first'
           alias k='kubectl'
           alias n='nnn -e'
+          alias ldo='lazydocker'
+          # Podman als lichte default, maar Docker is nog beschikbaar
+          alias p='podman'
           eval "$(starship init zsh)"
           eval "$(zoxide init zsh)"
           # --- GEÏMPORTEERD UIT BASHRC ---
           {{ legacy_files.results[0].content | b64decode if not legacy_files.results[0].failed else '# No bashrc' }}
 
-    - name: "10. Tmux Setup (Sync & Log)"
+    - name: "10. Tmux Setup (Nord & Sysadmin Hacks)"
       become: no
       copy:
         dest: "~/.tmux.conf"
@@ -130,9 +133,11 @@
           bind j select-pane -D
           bind k select-pane -U
           bind l select-pane -R
+          bind | split-window -h -c "#{pane_current_path}"
+          bind - split-window -v -c "#{pane_current_path}"
 
-    # --- 5. NEVIM & VIRTUALISATIE PLUGINS ---
-    - name: "11. Neovim Sysadmin IDE + Vimrc Legacy"
+    # --- 5. NEVIM & PLUGINS ---
+    - name: "11. Neovim IDE + Legacy Vimrc"
       become: no
       copy:
         dest: "~/.config/nvim/init.lua"
@@ -150,11 +155,12 @@
             { "lukas-reineke/indent-blankline.nvim", main = "ibl", opts = {} }
           })
           vim.opt.number = true
+          vim.opt.relativenumber = true
           vim.keymap.set('n', '<C-p>', require('telescope.builtin').find_files, {})
           -- --- GEÏMPORTEERD UIT VIMRC ---
           vim.cmd([[ {{ legacy_files.results[1].content | b64decode if not legacy_files.results[1].failed else '" No vimrc' }} ]])
 
-    - name: "12. Vagrant Libvirt Plugin (Lichte VM's)"
+    - name: "12. Vagrant Libvirt Plugin"
       become: no
       shell: "vagrant plugin install vagrant-libvirt"
       args:
