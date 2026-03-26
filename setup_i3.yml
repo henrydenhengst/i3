@@ -7,96 +7,113 @@
   vars:
     # --- NORD KLEURENPALET ---
     nord0:  "#2e3440" # Background
-    nord8:  "#88c0d0" # Frost Blue
+    nord8:  "#88c0d0" # Frost Blue (Accent)
     nord4:  "#d8dee9" # Snow White
 
     # --- VOLLEDIGE TOOLSET ---
     zsh_power: [zsh, zsh-autosuggestions, zsh-syntax-highlighting, fzf]
     devops_stack: [kubectl, terraform, azure-cli, awscli, eza]
     modern_unix: [bat, ripgrep, jq, yq, btop, nmap, mtr, glances]
-    gui_stack: [i3-wm, kitty, tmux, polybar, rofi, picom, feh, dunst]
+    gui_stack: [i3-wm, kitty, tmux, polybar, rofi, picom, feh, dunst, light]
     file_management: [nnn, ffmpegthumbnailer, mediainfo, sxiv]
 
   tasks:
-    - name: "1. Repositories & Keyrings (Kubernetes, HashiCorp, Eza)"
-      shell: |
-        mkdir -p /etc/apt/keyrings
-        curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/k8s.gpg --yes
-        echo 'deb [signed-by=/etc/apt/keyrings/k8s.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' > /etc/apt/sources.list.d/k8s.list
-        wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /etc/apt/keyrings/hashicorp.gpg --yes
-        echo "deb [signed-by=/etc/apt/keyrings/hashicorp.gpg] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main" > /etc/apt/sources.list.d/hashicorp.list
-        wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor -o /etc/apt/keyrings/eza.gpg --yes
-        echo "deb [signed-by=/etc/apt/keyrings/eza.gpg] http://deb.gierens.de stable main" > /etc/apt/sources.list.d/eza.list
-      args:
-        executable: /bin/bash
-
-    - name: "2. Installeer Hoofdstack via APT"
+    - name: "1. Pakketten Installeren (APT)"
       apt:
         name: "{{ zsh_power + devops_stack + modern_unix + gui_stack + file_management }}"
         state: present
         update_cache: yes
 
-    - name: "3. Externe Binaries (Starship, Zoxide, Helm, Lazydocker)"
+    - name: "2. Externe Binaries (Starship & Zoxide)"
       shell: |
         curl -sS https://starship.rs/install.sh | sh -s -- -y
         curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
-        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-        curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
       args:
         executable: /bin/bash
 
-    - name: "4. Systeemrechten & Gebruikers-shell (Zsh Force)"
+    - name: "3. Gebruikersinstellingen & Shell Switch"
       shell: |
-        groupadd -f docker
-        usermod -aG docker {{ lookup('env', 'USER') }}
+        usermod -aG docker,video {{ lookup('env', 'USER') }}
         chsh -s $(which zsh) {{ lookup('env', 'USER') }}
 
-    - name: "5. Config Mappen & nnn Plugins"
+    - name: "4. Config Mappen Aanmaken"
       become: no
-      shell: |
-        mkdir -p ~/.config/{i3,polybar,rofi,kitty,nnn,starship,btop}
-        rm -rf ~/.config/nnn/plugins
-        git clone --depth 1 https://github.com/jarun/nnn.git /tmp/nnn_repo
-        cp -r /tmp/nnn_repo/plugins/* ~/.config/nnn/plugins/
-        rm -rf /tmp/nnn_repo
-      args:
-        executable: /bin/bash
+      file:
+        path: "~/.config/{{ item }}"
+        state: directory
+      loop: [i3, polybar, rofi, kitty, nnn, btop]
 
-    - name: "6. Zshrc - De DevOps Motor (Zonder Bash-fouten)"
+    - name: "5. Zshrc - De DevOps Motor (Met Historie Fix)"
       become: no
       blockinfile:
         path: "~/.zshrc"
         create: yes
         marker: "# {mark} ANSIBLE MANAGED BLOCK"
         block: |
-          # Native Zsh Completion (Fix voor 'command not found: complete')
+          # --- HISTORIE INSTELLINGEN (Pijltje omhoog fix) ---
+          HISTFILE=~/.zsh_history
+          HISTSIZE=10000
+          SAVEHIST=10000
+          setopt APPEND_HISTORY          # Voeg toe aan bestand, overschrijf niet
+          setopt SHARE_HISTORY           # Deel historie tussen alle open terminals
+          setopt HIST_IGNORE_DUPS        # Negeer dubbele commando's achter elkaar
+          setopt HIST_REDUCE_BLANKS      # Verwijder overtollige spaties
+          
+          # Native Zsh Completion
           autoload -Uz compinit && compinit
           
-          export PATH=$PATH:/usr/local/bin:$HOME/.local/bin:$HOME/.bin
+          export PATH=$PATH:/usr/local/bin:$HOME/.local/bin
           
-          # Plugins
+          # Plugins laden
           source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
           source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-          
-          # nnn previews
-          export NNN_PLUGINS="p:preview-tui"
-          export NNN_FIFO='/tmp/nnn.fifo'
           
           # Aliassen
           alias n='nnn -a -P p'
           alias k='kubectl'
-          alias ldo='lazydocker'
           alias gupdate='~/git/i3/update_git.sh'
-          alias conf-ansible='nano ~/git/i3/setup_i3.yml'
-          
-          if command -v batcat > /dev/null; then alias bat='batcat'; fi
-          if command -v eza > /dev/null; then alias ls='eza --icons --group-directories-first'; fi
+          alias ls='eza --icons --group-directories-first'
+          alias hgrep='history | grep'
           
           # Inits
           eval "$(starship init zsh)"
           eval "$(zoxide init zsh)"
 
-    - name: "7. Nordic Git Update Script (Met Kleur)"
+    - name: "6. i3 Config (Wallpaper, Hardware & Styling)"
+      become: no
+      copy:
+        dest: "~/.config/i3/config"
+        content: |
+          set $mod Mod4
+          font pango:JetBrainsMono Nerd Font 10
+
+          # --- APPEARANCE ---
+          # Jouw specifieke wallpaper uit /usr/share/backgrounds
+          exec_always --no-startup-id feh --bg-fill /usr/share/backgrounds/1366x768-wallpaper18.jpg
+          exec_always --no-startup-id ~/.config/polybar/launch.sh
+
+          # --- HARDWARE SNELTOETSEN ---
+          # Volume
+          bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +5%
+          bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -5%
+          bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle
+          
+          # Helderheid (via 'light')
+          bindsym XF86MonBrightnessUp exec --no-startup-id light -A 5
+          bindsym XF86MonBrightnessDown exec --no-startup-id light -U 5
+
+          # --- WINDOW MANAGEMENT ---
+          bindsym $mod+Return exec kitty
+          bindsym $mod+d exec rofi -show drun
+          bindsym $mod+Shift+q kill
+          bindsym $mod+Shift+r restart
+          
+          # Nord Styling
+          client.focused {{ nord8 }} {{ nord8 }} {{ nord0 }} {{ nord8 }} {{ nord8 }}
+          gaps inner 10
+          new_window pixel 2
+
+    - name: "7. Bulletproof Git Update Script"
       become: no
       copy:
         dest: "~/git/i3/update_git.sh"
@@ -110,34 +127,32 @@
           set -e
           cd "$(dirname "$0")"
           echo -e "${BLUE}🚀 Homelab Git Update gestart...${NC}"
-          echo -e "${WHITE}📥 Remote wijzigingen ophalen (pull --rebase)...${NC}"
+          
+          git stash
+          echo -e "${WHITE}📥 Syncen met GitHub...${NC}"
           git pull origin main --rebase
+          git stash pop || true
+          
           if [ -z "$(git status --porcelain)" ]; then
-              echo -e "${BLUE}✨ Geen wijzigingen gevonden.${NC}"
+              echo -e "${BLUE}✨ Geen wijzigingen om te committen.${NC}"
               exit 0
           fi
+          
           git add .
           echo -ne "${WHITE}📝 Commit message: ${NC}"
           read msg
           [ -z "$msg" ] && msg="Daily update: $(date +'%Y-%m-%d %H:%M')"
+          
           git commit -m "$msg"
           echo -e "${BLUE}📤 Pushen naar GitHub...${NC}"
           git push origin main && echo -e "${GREEN}✅ Alles succesvol bijgewerkt!${NC}"
 
-    - name: "8. i3 & Polybar Configuratie"
+    - name: "8. Polybar Launcher"
       become: no
       copy:
-        dest: "{{ item.dest }}"
-        mode: "{{ item.mode | default('0644') }}"
-        content: "{{ item.content }}"
-      loop:
-        - { dest: "~/.config/i3/config", content: "set $mod Mod4\nfont pango:JetBrainsMono Nerd Font 10\nbindsym $mod+Return exec kitty\nbindsym $mod+d exec rofi -show drun\nexec_always --no-startup-id ~/.config/polybar/launch.sh" }
-        - { dest: "~/.config/polybar/launch.sh", mode: "0755", content: "#!/bin/bash\nkillall -q polybar\npolybar main &" }
-
-    - name: "9. Git Config Automatisering (SSH Force)"
-      become: no
-      shell: |
-        git config --global user.name "henrydenhengst"
-        git config --global user.email "jouw-email@voorbeeld.com"
-        cd ~/git/i3 && git remote set-url origin git@github.com:henrydenhengst/i3.git
-      ignore_errors: yes
+        dest: "~/.config/polybar/launch.sh"
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          killall -q polybar
+          polybar main &
