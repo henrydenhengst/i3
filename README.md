@@ -35,7 +35,7 @@ Dit project bevat de volledige configuratie voor een krachtig, Nordic-styled Dev
 ## 🚀 Installatie
 
 1. Clone de repository:
-   git clone https://github.com/Henrydenhengst/i3.git
+   git clone https://github.com/henrydenhengst/i3.git
    cd i3
 
 2. Draai het Playbook:
