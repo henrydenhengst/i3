@@ -7,7 +7,9 @@ ansible-playbook setup_i3.yml --ask-become-pass
 [Bekijk de sneltoetsen](sneltoetsen.md)
 
 
- # Functionele Beschrijving: Nordic Omni-Protocol Workstation
+# Functionele Beschrijving: 
+
+## Nordic Omni-Protocol Workstation i3wm
 
 Dit Ansible playbook bouwt een volledig functioneel DevOps-station met een focus op Sysadmin-workflow en esthetiek.
 
