@@ -1,5 +1,5 @@
 ---
-- name: "The Absolute Omni-Protocol: Nord DevOps, Sysadmin & Hybrid Container Master"
+- name: "The Absolute Omni-Protocol: Nord DevOps & Zsh Master"
   hosts: localhost
   connection: local
   become: yes
@@ -7,22 +7,18 @@
   vars:
     # --- NORD KLEURENPALET ---
     nord0:  "#2e3440" # Background
-    nord1:  "#3b4252" # Statusbars
-    nord8:  "#88c0d0" # Frost Blue (Accent)
+    nord8:  "#88c0d0" # Frost Blue
     nord4:  "#d8dee9" # Snow White
 
     # --- VOLLEDIGE TOOLSET ---
     zsh_power: [zsh, zsh-autosuggestions, zsh-syntax-highlighting, fzf]
     devops_stack: [kubectl, terraform, azure-cli, awscli, eza]
-    modern_unix: [bat, ripgrep, jq, yq, btop, nmap, mtr, glances, termshark]
-    gui_stack: [i3-wm, kitty, tmux, polybar, rofi, picom, feh, dunst, light, pavucontrol, falkon]
-    # Extra dependencies voor previews (sxiv, libvips)
-    file_management: [nnn, ranger, mc, ffmpegthumbnailer, mediainfo, imagemagick, poppler-utils, sxiv, libvips-tools]
-    light_virt: [vagrant, qemu-kvm, libvirt-daemon-system, libvirt-clients, podman, buildah, skopeo]
+    modern_unix: [bat, ripgrep, jq, yq, btop, nmap, mtr, glances]
+    gui_stack: [i3-wm, kitty, tmux, polybar, rofi, picom, feh, dunst]
+    file_management: [nnn, ffmpegthumbnailer, mediainfo, sxiv]
 
   tasks:
-    # --- 1. REPO PREPARATIE ---
-    - name: "1. Repositories & Keyrings Injectie"
+    - name: "1. Repositories & Keyrings (Kubernetes, HashiCorp, Eza)"
       shell: |
         mkdir -p /etc/apt/keyrings
         curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/k8s.gpg --yes
@@ -34,119 +30,114 @@
       args:
         executable: /bin/bash
 
-    # --- 2. BINARY INSTALLATIE (De 'No-Compromise' Tools) ---
-    - name: "2. Installeer Externe Binaries (Helm, Starship, Zoxide, Gping, Dust, Doggo, SD)"
+    - name: "2. Installeer Hoofdstack via APT"
+      apt:
+        name: "{{ zsh_power + devops_stack + modern_unix + gui_stack + file_management }}"
+        state: present
+        update_cache: yes
+
+    - name: "3. Externe Binaries (Starship, Zoxide, Helm, Lazydocker)"
       shell: |
-        # Installers
         curl -sS https://starship.rs/install.sh | sh -s -- -y
         curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
         curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
         curl -sL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
-        
-        cd /tmp
-        # Gping
-        G_URL=$(curl -s https://api.github.com/repos/orf/gping/releases/latest | grep browser_download_url | grep x86_64-unknown-linux-musl.tar.gz | cut -d '"' -f 4)
-        wget -O gping.tar.gz "$G_URL" && tar -xvzf gping.tar.gz && mv gping /usr/local/bin/
-        # Dust
-        D_URL=$(curl -s https://api.github.com/repos/bootandy/dust/releases/latest | grep browser_download_url | grep x86_64-unknown-linux-musl.tar.gz | cut -d '"' -f 4)
-        wget -O dust.tar.gz "$D_URL" && tar -xvzf dust.tar.gz && mv dust-*/dust /usr/local/bin/
-        # Doggo
-        DO_URL=$(curl -s https://api.github.com/repos/mr-karan/doggo/releases/latest | grep browser_download_url | grep Linux_x86_64.tar.gz | cut -d '"' -f 4)
-        wget -O doggo.tar.gz "$DO_URL" && tar -xvzf doggo.tar.gz && mv doggo /usr/local/bin/
-        # SD
-        SD_URL=$(curl -s https://api.github.com/repos/chmln/sd/releases/latest | grep browser_download_url | grep x86_64-unknown-linux-musl | cut -d '"' -f 4)
-        wget -O sd "$SD_URL" && chmod +x sd && mv sd /usr/local/bin/
-        rm -rf *.tar.gz dust-*
       args:
         executable: /bin/bash
 
-    # --- 3. DE GROTE APT INSTALLATIE ---
-    - name: "3. Installeer de Hoofdstack via APT"
-      apt:
-        name: "{{ zsh_power + devops_stack + modern_unix + gui_stack + file_management + light_virt }}"
-        state: present
-        update_cache: yes
-      ignore_errors: yes
-
-    # --- 4. GEBRUIKER & RECHTEN ---
-    - name: "4. Systeemrechten (Shell, Docker, KVM)"
+    - name: "4. Systeemrechten & Gebruikers-shell (Zsh Force)"
       shell: |
-        for g in docker libvirt kvm; do groupadd -f $g; done
-        usermod -aG docker,libvirt,kvm {{ lookup('env', 'USER') }}
+        groupadd -f docker
+        usermod -aG docker {{ lookup('env', 'USER') }}
         chsh -s $(which zsh) {{ lookup('env', 'USER') }}
 
-    # --- 5. CONFIG MAPPEN & PLUGINS ---
-    - name: "5. Config Mappen & nnn Plugins (Git Method)"
+    - name: "5. Config Mappen & nnn Plugins"
       become: no
       shell: |
-        mkdir -p ~/.config/{i3,polybar,rofi,kitty,nnn,nvim,starship,btop,k9s,ranger,falkon,dunst,picom}
+        mkdir -p ~/.config/{i3,polybar,rofi,kitty,nnn,starship,btop}
         rm -rf ~/.config/nnn/plugins
         git clone --depth 1 https://github.com/jarun/nnn.git /tmp/nnn_repo
-        mkdir -p ~/.config/nnn/plugins
         cp -r /tmp/nnn_repo/plugins/* ~/.config/nnn/plugins/
         rm -rf /tmp/nnn_repo
       args:
         executable: /bin/bash
 
-    - name: "6. Installeer JetBrainsMono Nerd Font"
+    - name: "6. Zshrc - De DevOps Motor (Zonder Bash-fouten)"
       become: no
-      shell: |
-        mkdir -p ~/.local/share/fonts
-        curl -L https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz | tar --extract --xz -C ~/.local/share/fonts
-        fc-cache -fv
-      args:
-        creates: "~/.local/share/fonts/JetBrainsMonoNerdFont-Regular.ttf"
+      blockinfile:
+        path: "~/.zshrc"
+        create: yes
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+        block: |
+          # Native Zsh Completion (Fix voor 'command not found: complete')
+          autoload -Uz compinit && compinit
+          
+          export PATH=$PATH:/usr/local/bin:$HOME/.local/bin:$HOME/.bin
+          
+          # Plugins
+          source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+          source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+          
+          # nnn previews
+          export NNN_PLUGINS="p:preview-tui"
+          export NNN_FIFO='/tmp/nnn.fifo'
+          
+          # Aliassen
+          alias n='nnn -a -P p'
+          alias k='kubectl'
+          alias ldo='lazydocker'
+          alias gupdate='~/git/i3/update_git.sh'
+          alias conf-ansible='nano ~/git/i3/setup_i3.yml'
+          
+          if command -v batcat > /dev/null; then alias bat='batcat'; fi
+          if command -v eza > /dev/null; then alias ls='eza --icons --group-directories-first'; fi
+          
+          # Inits
+          eval "$(starship init zsh)"
+          eval "$(zoxide init zsh)"
 
-    # --- 6. LEGACY DOTFILE MIGRATIE ---
-    - name: "7. Importeer oude Bashrc & Vimrc"
+    - name: "7. Nordic Git Update Script (Met Kleur)"
       become: no
-      slurp:
-        src: "~/{{ item }}"
-      register: legacy_files
-      ignore_errors: yes
-      loop: [".bashrc", ".vimrc"]
+      copy:
+        dest: "~/git/i3/update_git.sh"
+        mode: "0755"
+        content: |
+          #!/bin/bash
+          BLUE='\033[0;81m'
+          GREEN='\033[0;32m'
+          WHITE='\033[0;37m'
+          NC='\033[0m'
+          set -e
+          cd "$(dirname "$0")"
+          echo -e "${BLUE}🚀 Homelab Git Update gestart...${NC}"
+          echo -e "${WHITE}📥 Remote wijzigingen ophalen (pull --rebase)...${NC}"
+          git pull origin main --rebase
+          if [ -z "$(git status --porcelain)" ]; then
+              echo -e "${BLUE}✨ Geen wijzigingen gevonden.${NC}"
+              exit 0
+          fi
+          git add .
+          echo -ne "${WHITE}📝 Commit message: ${NC}"
+          read msg
+          [ -z "$msg" ] && msg="Daily update: $(date +'%Y-%m-%d %H:%M')"
+          git commit -m "$msg"
+          echo -e "${BLUE}📤 Pushen naar GitHub...${NC}"
+          git push origin main && echo -e "${GREEN}✅ Alles succesvol bijgewerkt!${NC}"
 
-    # --- 7. GUI CONFIGURATIE (Nordic i3wm) ---
-    - name: "8. Configureer i3 & Polybar (Nordic Block)"
+    - name: "8. i3 & Polybar Configuratie"
       become: no
       copy:
         dest: "{{ item.dest }}"
         mode: "{{ item.mode | default('0644') }}"
         content: "{{ item.content }}"
       loop:
-        - { dest: "~/.config/i3/config", content: "set $mod Mod4\nfont pango:JetBrainsMono Nerd Font 10\nclient.focused {{ nord8 }} {{ nord8 }} {{ nord0 }} {{ nord8 }} {{ nord8 }}\nexec_always --no-startup-id ~/.config/polybar/launch.sh\nbindsym $mod+Return exec kitty\nbindsym $mod+d exec rofi -show drun\ngaps inner 8\nnew_window pixel 2" }
+        - { dest: "~/.config/i3/config", content: "set $mod Mod4\nfont pango:JetBrainsMono Nerd Font 10\nbindsym $mod+Return exec kitty\nbindsym $mod+d exec rofi -show drun\nexec_always --no-startup-id ~/.config/polybar/launch.sh" }
         - { dest: "~/.config/polybar/launch.sh", mode: "0755", content: "#!/bin/bash\nkillall -q polybar\npolybar main &" }
-        - { dest: "~/.config/polybar/config.ini", content: "[bar/main]\nwidth=100%\nheight=26\nbackground={{ nord0 }}\nforeground={{ nord4 }}\nfont-0=\"JetBrainsMono Nerd Font:size=10;2\"\nmodules-center=date\n[module/date]\ntype=internal/date\ndate=\" %H:%M \"\nformat-foreground={{ nord8 }}" }
 
-    # --- 8. SYSADMIN ENGINE (Zsh motor & Previews) ---
-    - name: "9. Zshrc - De DevOps Motor (Inclusief nnn Preview)"
-      become: no
-      blockinfile:
-        path: "~/.zshrc"
-        create: yes
-        block: |
-          export PATH=$PATH:/usr/local/bin:$HOME/.local/bin
-          # nnn instellingen voor Kitty previews
-          export NNN_PLUGINS="p:preview-tui"
-          export NNN_FIFO='/tmp/nnn.fifo'
-          export NNN_OPTS="H"
-          
-          source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-          source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-          alias k='kubectl'
-          alias n='nnn -a -P p'
-          alias ldo='lazydocker'
-          if command -v batcat > /dev/null; then alias bat='batcat'; fi
-          if command -v eza > /dev/null; then alias ls='eza --icons --group-directories-first'; else alias ls='ls --color=auto'; fi
-          eval "$(starship init zsh)"
-          eval "$(zoxide init zsh)"
-          # --- GEÏMPORTEERD UIT BASHRC ---
-          {{ legacy_files.results[0].content | b64decode if not (legacy_files.results[0].failed | default(true)) else '# No legacy bashrc' }}
-
-    - name: "10. Skins & Finalisatie"
+    - name: "9. Git Config Automatisering (SSH Force)"
       become: no
       shell: |
-        curl -Ls https://raw.githubusercontent.com/derailed/k9s/master/skins/nord.yaml > ~/.config/k9s/skin.yml
-        curl -Ls https://raw.githubusercontent.com/aristocratos/btop/main/themes/nord.theme > ~/.config/btop/themes/nord.theme
-        vagrant plugin install vagrant-libvirt || true
+        git config --global user.name "henrydenhengst"
+        git config --global user.email "jouw-email@voorbeeld.com"
+        cd ~/git/i3 && git remote set-url origin git@github.com:henrydenhengst/i3.git
       ignore_errors: yes
