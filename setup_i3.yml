@@ -1,44 +1,48 @@
 ---
-- name: "The Absolute Omni-Protocol: Nord DevOps & Sysadmin Master Setup"
+- name: "The God-Mode Nordic DevOps & Sysadmin Master Setup"
   hosts: localhost
   connection: local
   become: yes
 
   vars:
     # --- NORD KLEURENPALET ---
-    nord0:  "#2e3440" # Background
-    nord1:  "#3b4252" # Statusbars
-    nord8:  "#88c0d0" # Frost Blue (Accent)
-    nord4:  "#d8dee9" # Snow White
+    nord0:  "#2e3440" 
+    nord1:  "#3b4252" 
+    nord8:  "#88c0d0" 
+    nord4:  "#d8dee9"
 
-    # --- DE VOLLEDIGE TOOLSET (CLI + DEVOPS + GUI) ---
+    # --- DE VOLLEDIGE TOOLSET ---
     zsh_power: [zsh, zsh-autosuggestions, zsh-syntax-highlighting, starship, zoxide, fzf]
     devops_stack: [kubectl, k9s, kubectx, kubens, helm, stern, lazydocker, dive, terraform, tflint, ansible-lint, azure-cli, awscli]
     modern_unix: [bat, eza, ripgrep, fd-find, jq, yq, btop, gping, duf, dust, doggo, curlie, cheat, sd, glances, termshark, nmap, mtr]
     gui_stack: [i3-wm, kitty, tmux, polybar, rofi, picom, feh, dunst, light, pavucontrol, falkon]
-    preview_deps: [nnn, ranger, mc, ffmpegthumbnailer, mediainfo, imagemagick, poppler-utils, ueberzugpp]
+    file_management: [nnn, ranger, mc, lf, ffmpegthumbnailer, mediainfo, imagemagick, poppler-utils, ueberzugpp]
+    # Virtualisatie voor oude laptops (KVM is lichter dan VirtualBox)
+    virtualization: [vagrant, qemu-kvm, libvirt-daemon-system, libvirt-clients, bridge-utils, virt-manager]
 
   tasks:
     # --- 1. CORE INSTALLATIE ---
-    - name: "Installeer de volledige Stack (100+ Tools)"
+    - name: "1. Installeer de volledige Stack (100+ Tools & Virtualisatie)"
       apt:
-        name: "{{ zsh_power + devops_stack + modern_unix + gui_stack + preview_deps }}"
+        name: "{{ zsh_power + devops_stack + modern_unix + gui_stack + file_management + virtualization }}"
         state: present
         update_cache: yes
 
-    - name: "Stel Zsh in als standaard shell"
+    - name: "2. Rechten voor Virtualisatie & Shell"
       user:
         name: "{{ lookup('env', 'USER') }}"
         shell: /bin/zsh
+        groups: libvirt,kvm
+        append: yes
 
-    - name: "Maak alle Config Mappen aan"
+    - name: "3. Maak alle Config Mappen aan"
       become: no
       file:
         path: "~/.config/{{ item }}"
         state: directory
       loop: [i3, polybar, rofi, kitty, nnn, nvim, starship, btop, k9s, ranger, falkon, dunst, picom]
 
-    - name: "Installeer JetBrainsMono Nerd Font"
+    - name: "4. Installeer JetBrainsMono Nerd Font"
       shell: |
         mkdir -p ~/.local/share/fonts
         curl -L https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz | tar --extract --xz -C ~/.local/share/fonts
@@ -47,21 +51,16 @@
       args:
         creates: "~/.local/share/fonts/JetBrainsMonoNerdFont-Regular.ttf"
 
-    # --- 2. LEGACY DOTFILE MIGRATIE (Bashrc & Vimrc) ---
-    - name: "Lees huidige .bashrc in (voor aliassen/functies)"
+    # --- 2. LEGACY DOTFILE MIGRATIE ---
+    - name: "5. Importeer oude Bashrc & Vimrc"
       slurp:
-        src: "~/.bashrc"
-      register: old_bashrc
+        src: "~{{ item }}"
+      register: legacy_files
       ignore_errors: yes
+      loop: [/.bashrc, /.vimrc]
 
-    - name: "Lees huidige .vimrc in (voor bindings/macro's)"
-      slurp:
-        src: "~/.vimrc"
-      register: old_vimrc
-      ignore_errors: yes
-
-    # --- 3. GUI CONFIGURATIE (i3, Polybar, Rofi, Falkon, Picom) ---
-    - name: "Configureer i3 (Nord & Random Wallpaper)"
+    # --- 3. GUI CONFIGURATIE (Nordic i3wm) ---
+    - name: "6. Configureer i3 (Nord & Random Wallpaper)"
       become: no
       copy:
         dest: "~/.config/i3/config"
@@ -78,7 +77,7 @@
           gaps inner 8
           new_window pixel 2
 
-    - name: "Configureer Polybar & Rofi (Nord)"
+    - name: "7. Configureer Polybar & Rofi (Nord)"
       become: no
       copy:
         dest: "{{ item.dest }}"
@@ -87,24 +86,15 @@
       loop:
         - { dest: "~/.config/polybar/launch.sh", mode: "0755", content: "#!/bin/bash\nkillall -q polybar\npolybar main &" }
         - { dest: "~/.config/polybar/config.ini", content: "[bar/main]\nwidth=100%\nheight=26\nbackground={{ nord0 }}\nforeground={{ nord4 }}\nfont-0=\"JetBrainsMono Nerd Font:size=10;2\"\nmodules-left=i3\nmodules-center=date\nmodules-right=cpu memory\n[module/i3]\ntype=internal/i3\nlabel-focused-underline={{ nord8 }}\nlabel-focused-padding=2\n[module/date]\ntype=internal/date\ndate=\" %H:%M \"\nformat-foreground={{ nord8 }}" }
-        - { dest: "~/.config/rofi/config.rasi", content: "configuration { modi: \"drun\"; show-icons: true; font: \"JetBrainsMono Nerd Font 11\"; }\n* { background-color: {{ nord0 }}; text-color: {{ nord4 }}; accent: {{ nord8 }}; }\nelement selected { background-color: @accent; text-color: {{ nord0 }}; }" }
 
-    - name: "Falkon Sysadmin Tuning (Privacy & Speed)"
+    - name: "8. Falkon Browser Tuning"
       become: no
       copy:
         dest: "~/.config/falkon/settings.ini"
-        content: |
-          [Web-Browsing]
-          EnableSmoothScrolling=false
-          DoNotTrack=true
-          [AdBlock]
-          Enabled=true
-          UseEmbeddedAbp=true
-          [NavigationBar]
-          DefaultSearchEngine=Startpage
+        content: "[Web-Browsing]\nEnableSmoothScrolling=false\nDoNotTrack=true\n[AdBlock]\nEnabled=true\n[NavigationBar]\nDefaultSearchEngine=Startpage"
 
-    # --- 4. DE ENGINE (Zsh, Tmux, nnn) ---
-    - name: "Zshrc - De DevOps Motor + Bash Legacy"
+    # --- 4. SYSADMIN ENGINE (Zsh, Tmux, Vagrant) ---
+    - name: "9. Zshrc - De DevOps Motor + Bash Legacy"
       become: no
       blockinfile:
         path: "~/.zshrc"
@@ -114,29 +104,35 @@
           source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
           export BAT_THEME="Nord"
           export NNN_PLUG='p:preview-tui'
-          export NNN_PREVIEW_IMGPROG='kitty'
+          export VAGRANT_DEFAULT_PROVIDER=libvirt
           if [ -z "$SSH_AUTH_SOCK" ]; then eval `ssh-agent -s`; ssh-add ~/.ssh/id_rsa 2>/dev/null; fi
           alias ls='eza --icons --group-directories-first'
           alias k='kubectl'
           alias n='nnn -e'
-          alias ldo='lazydocker'
           eval "$(starship init zsh)"
           eval "$(zoxide init zsh)"
-          
           # --- GEÏMPORTEERD UIT BASHRC ---
-          {{ old_bashrc['content'] | b64decode if old_bashrc['content'] is defined else '# Geen Bashrc gevonden' }}
+          {{ legacy_files.results[0].content | b64decode if not legacy_files.results[0].failed else '# No bashrc' }}
 
-    - name: "Kitty & Tmux (Sysadmin Focus)"
+    - name: "10. Tmux Setup (Sync & Log)"
       become: no
       copy:
-        dest: "{{ item.dest }}"
-        content: "{{ item.content }}"
-      loop:
-        - { dest: "~/.config/kitty/kitty.conf", content: "font_family JetBrainsMono Nerd Font\nbackground {{ nord0 }}\nbackground_opacity 0.92\nshell tmux" }
-        - { dest: "~/.tmux.conf", content: "set -g default-shell /bin/zsh\nset -g prefix C-a\nset -g mouse on\nset -g status-style bg='{{ nord1 }}',fg='{{ nord8 }}'\nset -g status-left \"#[bg={{ nord8 }},fg={{ nord0 }},bold] #S #[default] \"\nset -g status-right \"#[fg={{ nord4 }}] ☸ #(kubectl config current-context) %H:%M \"\nbind y setw synchronize-panes\nbind P pipe-pane -o \"cat >> ~/#W-tmux.log\" \\; display \"Logging to ~/#W-tmux.log\"\nbind h select-pane -L\nbind j select-pane -D\nbind k select-pane -U\nbind l select-pane -R\nbind | split-window -h -c \"#{pane_current_path}\"\nbind - split-window -v -c \"#{pane_current_path}\"" }
+        dest: "~/.tmux.conf"
+        content: |
+          set -g default-shell /bin/zsh
+          set -g prefix C-a
+          set -g mouse on
+          set -g status-style bg='{{ nord1 }}',fg='{{ nord8 }}'
+          set -g status-right " ☸ #(kubectl config current-context) %H:%M "
+          bind y setw synchronize-panes
+          bind P pipe-pane -o "cat >> ~/#W-tmux.log" \; display "Logging to ~/#W-tmux.log"
+          bind h select-pane -L
+          bind j select-pane -D
+          bind k select-pane -U
+          bind l select-pane -R
 
-    # --- 5. NEVIM (LSP, Nord & Vimrc Legacy) ---
-    - name: "Neovim - Sysadmin IDE + Vimrc Legacy"
+    # --- 5. NEVIM & VIRTUALISATIE PLUGINS ---
+    - name: "11. Neovim Sysadmin IDE + Vimrc Legacy"
       become: no
       copy:
         dest: "~/.config/nvim/init.lua"
@@ -148,23 +144,23 @@
           vim.opt.rtp:prepend(lazypath)
           require("lazy").setup({
             { "shaunsingh/nord.nvim", priority = 1000, config = function() vim.cmd[[colorscheme nord]] end },
-            { "nvim-treesitter/nvim-treesitter", build = ":TSUpdate" },
+            { "nvim-treesitter/nvim-treesitter" },
             { "neovim/nvim-lspconfig" },
             { "nvim-telescope/telescope.nvim", dependencies = { "nvim-lua/plenary.nvim" } },
             { "lukas-reineke/indent-blankline.nvim", main = "ibl", opts = {} }
           })
           vim.opt.number = true
-          vim.opt.relativenumber = true
-          vim.opt.shiftwidth = 2
           vim.keymap.set('n', '<C-p>', require('telescope.builtin').find_files, {})
-          
           -- --- GEÏMPORTEERD UIT VIMRC ---
-          vim.cmd([[
-          {{ old_vimrc['content'] | b64decode if old_vimrc['content'] is defined else '" Geen Vimrc gevonden' }}
-          ]])
+          vim.cmd([[ {{ legacy_files.results[1].content | b64decode if not legacy_files.results[1].failed else '" No vimrc' }} ]])
 
-    # --- 6. SKINS & FINISHING ---
-    - name: "Download Skins & Finaliseer"
+    - name: "12. Vagrant Libvirt Plugin (Lichte VM's)"
+      become: no
+      shell: "vagrant plugin install vagrant-libvirt"
+      args:
+        creates: "~/.vagrant.d/plugins.json"
+
+    - name: "13. Finaliseer Skins & Plugins"
       become: no
       shell: |
         curl -Ls https://raw.githubusercontent.com/derailed/k9s/master/skins/nord.yaml > ~/.config/k9s/skin.yml
