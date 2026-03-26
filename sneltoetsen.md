@@ -1,38 +1,47 @@
-# ❄️ Nordic Sysadmin Cheat Sheet (2026 Edition)
+# ❄️ De Volledige Nordic Omni-Protocol Cheat Sheet
 
-Dit is de gecombineerde lijst voor i3wm, Tmux, Podman en Vagrant.
+## 🖥️ i3 Window Manager (Systeem)
+* $mod + Enter       : Open Kitty Terminal (start direct in Tmux)
+* $mod + d           : Rofi (Programma's zoeken/starten)
+* $mod + Shift + q   : Sluit huidige venster (Kill)
+* $mod + Shift + e   : Exit i3 (Uitloggen)
+* $mod + Shift + r   : Herstart i3 (Reload config + nieuwe wallpaper)
 
-## 🚀 Desktop (i3wm)
-* `$mod + Enter` : Open Kitty (Start direct in Tmux)
-* `$mod + w`     : Open Falkon Browser (Workspace 1)
-* `$mod + d`     : Open Rofi (Programma's zoeken)
-* `$mod + Shift + q` : Sluit actief venster
-* `$mod + Shift + r` : Herstart i3 (Nieuwe wallpaper + Config reload)
-* `$mod + minus (-)` : Toon/verberg Scratchpad (Zwevend venster)
+## 🪟 Venster Beheer (Layout)
+* $mod + h           : Split horizontaal (volgende venster komt ernaast)
+* $mod + v           : Split verticaal (volgende venster komt eronder)
+* $mod + f           : Fullscreen aan/uit
+* $mod + s           : Stacking layout (vensters boven elkaar)
+* $mod + e           : Default layout (vensters naast elkaar)
+* $mod + Shift + Spatie : Maak venster zwevend (Floating)
+* $mod + r           : Resize modus (gebruik pijltjestoetsen, Esc om te stoppen)
 
-## 📟 Terminal & Multiplexer (Tmux)
-*Let op: Prefix is nu Ctrl + a*
+## 🚀 Navigatie & Workspaces
+* $mod + [1-9]       : Wissel naar Workspace 1-9
+* $mod + Shift + [1-9] : Verplaats venster naar Workspace 1-9
+* $mod + j/k/l/;     : Focus verplaatsen (Vim-stijl: links, onder, boven, rechts)
+* $mod + Shift + j/k/l/; : Venster verplaatsen (Vim-stijl)
 
-* `Prefix + y`   : **Sync Mode** (Typ in alle panelen tegelijk) - *Nieuw!*
-* `Prefix + P`   : **Sessie Loggen** naar bestand - *Nieuw!*
-* `Prefix + |`   : Split scherm verticaal
-* `Prefix + -`   : Split scherm horizontaal
-* `Prefix + z`   : Zoom paneel (Fullscreen in terminal)
-* `Prefix + h/j/k/l` : Navigeer tussen panelen (Vim-stijl)
+## 📟 Tmux Multiplexer (Prefix = Ctrl + a)
+* Prefix + |         : Split paneel verticaal
+* Prefix + -         : Split paneel horizontaal
+* Prefix + h/j/k/l   : Wissel tussen panelen
+* Prefix + z         : Zoom paneel (Fullscreen in terminal)
+* Prefix + y         : SYNC MODE (Typ in alle panelen tegelijk)
+* Prefix + P         : LOGGING (Start/Stop opslaan van sessie naar bestand)
+* Prefix + d         : Detach (Verlaat Tmux, sessie blijft draaien)
+* Prefix + [         : Scroll modus (gebruik pijltjestoetsen om omhoog te kijken)
 
-## ☁️ Containers & VM (Docker/Podman/Vagrant)
-* `p`            : Alias voor `podman` (Lichte Docker vervanger) - *Nieuw!*
-* `ldo`          : Open `lazydocker` (Werkt voor Docker én Podman)
-* `k`            : Alias voor `kubectl`
-* `ctx` / `ns`   : Wissel K8s Context of Namespace
-* `v up`         : `vagrant up --provider=libvirt` (Snelste VM start) - *Nieuw!*
+## ☁️ DevOps & CLI Aliassen
+* k                  : kubectl
+* ldo                : lazydocker (Beheer Docker & Podman visueel)
+* p                  : podman (Lichte Docker vervanger)
+* n                  : nnn (File manager. Type ';' dan 'p' voor previews)
+* ctx / ns           : Snel wisselen van K8s context of namespace
+* v up               : vagrant up --provider=libvirt
+* v ssh              : vagrant ssh
 
-## 📝 Editing & Files
-* `n`            : Open `nnn` File Manager (Druk `;p` voor previews)
-* `Ctrl + p`     : In Neovim: Zoek naar bestanden (Telescope)
-* `bat <file>`   : Bekijk bestanden met Nord-syntax highlighting
-
----
-Locatie configs: ~/.config/i3/ | ~/.zshrc | ~/.config/nvim/
-
-Repo: henrydenhengst/i3
+## ✍️ Neovim (IDE)
+* Ctrl + p           : Telescope (Snel bestanden zoeken in je project)
+* :q!                : Sluiten zonder opslaan
+* :wq                : Opslaan en sluiten
