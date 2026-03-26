@@ -7,8 +7,11 @@
   vars:
     # --- NORD KLEURENPALET ---
     nord0:  "#2e3440" # Background
+    nord3:  "#4c566a" # Lichtgrijs (segmenten)
     nord8:  "#88c0d0" # Frost Blue (Accent)
-    nord4:  "#d8dee9" # Snow White
+    nord10: "#5e81ac" # Deep Blue (Segmenten)
+    nord11: "#bf616a" # Rood (Error)
+    nord14: "#a3be8c" # Groen (Success)
 
     # --- VOLLEDIGE TOOLSET ---
     zsh_power: [zsh, zsh-autosuggestions, zsh-syntax-highlighting, fzf]
@@ -41,34 +44,30 @@
       file:
         path: "~/.config/{{ item }}"
         state: directory
-      loop: [i3, polybar, rofi, kitty, nnn, btop]
+      loop: [i3, polybar, rofi, kitty, nnn, starship]
 
-    - name: "5. Zshrc - De DevOps Motor (Met Historie Fix)"
+    - name: "5. Zshrc - De DevOps Motor (Historie & Inits)"
       become: no
       blockinfile:
         path: "~/.zshrc"
         create: yes
         marker: "# {mark} ANSIBLE MANAGED BLOCK"
         block: |
-          # --- HISTORIE INSTELLINGEN (Pijltje omhoog fix) ---
+          # --- HISTORIE ---
           HISTFILE=~/.zsh_history
           HISTSIZE=10000
           SAVEHIST=10000
-          setopt APPEND_HISTORY          # Voeg toe aan bestand, overschrijf niet
-          setopt SHARE_HISTORY           # Deel historie tussen alle open terminals
-          setopt HIST_IGNORE_DUPS        # Negeer dubbele commando's achter elkaar
-          setopt HIST_REDUCE_BLANKS      # Verwijder overtollige spaties
+          setopt APPEND_HISTORY
+          setopt SHARE_HISTORY
+          setopt HIST_IGNORE_DUPS
           
-          # Native Zsh Completion
           autoload -Uz compinit && compinit
-          
           export PATH=$PATH:/usr/local/bin:$HOME/.local/bin
           
-          # Plugins laden
+          # Plugins & Aliassen
           source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
           source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
           
-          # Aliassen
           alias n='nnn -a -P p'
           alias k='kubectl'
           alias gupdate='~/git/i3/update_git.sh'
@@ -79,7 +78,52 @@
           eval "$(starship init zsh)"
           eval "$(zoxide init zsh)"
 
-    - name: "6. i3 Config (Wallpaper, Hardware & Styling)"
+    - name: "6. Starship Nord Powerline Theme (Fix Syntax)"
+      become: no
+      copy:
+        dest: "~/.config/starship.toml"
+        content: |
+          format = """[]({{ nord8 }})$directory[](fg:{{ nord8 }} bg:{{ nord3 }})$git_branch$git_status[](fg:{{ nord3 }} bg:{{ nord10 }})$kubernetes[](fg:{{ nord10 }}) $line_break$character"""
+          add_newline = false
+
+          [directory]
+          style = "bg:{{ nord8 }} fg:{{ nord0 }} bold"
+          format = "[ $path ]($style)"
+          truncation_length = 3
+
+          [git_branch]
+          symbol = "  "
+          style = "bg:{{ nord3 }} fg:{{ nord8 }} bold"
+          format = "[$symbol$branch]($style)"
+
+          [git_status]
+          style = "bg:{{ nord3 }} fg:{{ nord11 }} bold"
+          format = "([$all_status$ahead_behind]($style))"
+
+          [kubernetes]
+          symbol = " ☸ "
+          disabled = false
+          style = "bg:{{ nord10 }} fg:{{ nord0 }} bold"
+          format = "[$symbol$context]($style)"
+
+          [character]
+          success_symbol = "[❯](bold {{ nord14 }})"
+          error_symbol = "[✖](bold {{ nord11 }})"
+
+    - name: "7. Kitty Terminal Config (Nord + Transparant)"
+      become: no
+      copy:
+        dest: "~/.config/kitty/kitty.conf"
+        content: |
+          font_family      JetBrainsMono Nerd Font
+          font_size        11.0
+          background       {{ nord0 }}
+          foreground       #d8dee9
+          background_opacity 0.90
+          confirm_os_window_close 0
+          window_padding_width 10
+
+    - name: "8. i3 Config (Wallpaper & Hardware)"
       become: no
       copy:
         dest: "~/.config/i3/config"
@@ -88,17 +132,13 @@
           font pango:JetBrainsMono Nerd Font 10
 
           # --- APPEARANCE ---
-          # Jouw specifieke wallpaper uit /usr/share/backgrounds
           exec_always --no-startup-id feh --bg-fill /usr/share/backgrounds/1366x768-wallpaper18.jpg
           exec_always --no-startup-id ~/.config/polybar/launch.sh
 
           # --- HARDWARE SNELTOETSEN ---
-          # Volume
           bindsym XF86AudioRaiseVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +5%
           bindsym XF86AudioLowerVolume exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ -5%
           bindsym XF86AudioMute exec --no-startup-id pactl set-sink-mute @DEFAULT_SINK@ toggle
-          
-          # Helderheid (via 'light')
           bindsym XF86MonBrightnessUp exec --no-startup-id light -A 5
           bindsym XF86MonBrightnessDown exec --no-startup-id light -U 5
 
@@ -108,12 +148,12 @@
           bindsym $mod+Shift+q kill
           bindsym $mod+Shift+r restart
           
-          # Nord Styling
-          client.focused {{ nord8 }} {{ nord8 }} {{ nord0 }} {{ nord8 }} {{ nord8 }}
+          # Styling
+          client.focused {{ nord8 }} {{ nord8 }} {{ nord0 }} {{ nord8 }}
           gaps inner 10
           new_window pixel 2
 
-    - name: "7. Bulletproof Git Update Script"
+    - name: "9. Bulletproof Git Update Script"
       become: no
       copy:
         dest: "~/git/i3/update_git.sh"
@@ -127,27 +167,21 @@
           set -e
           cd "$(dirname "$0")"
           echo -e "${BLUE}🚀 Homelab Git Update gestart...${NC}"
-          
           git stash
-          echo -e "${WHITE}📥 Syncen met GitHub...${NC}"
           git pull origin main --rebase
           git stash pop || true
-          
           if [ -z "$(git status --porcelain)" ]; then
-              echo -e "${BLUE}✨ Geen wijzigingen om te committen.${NC}"
+              echo -e "${BLUE}✨ Al up-to-date.${NC}"
               exit 0
           fi
-          
           git add .
           echo -ne "${WHITE}📝 Commit message: ${NC}"
           read msg
-          [ -z "$msg" ] && msg="Daily update: $(date +'%Y-%m-%d %H:%M')"
-          
+          [ -z "$msg" ] && msg="Update: $(date +'%Y-%m-%d %H:%M')"
           git commit -m "$msg"
-          echo -e "${BLUE}📤 Pushen naar GitHub...${NC}"
           git push origin main && echo -e "${GREEN}✅ Alles succesvol bijgewerkt!${NC}"
 
-    - name: "8. Polybar Launcher"
+    - name: "10. Polybar Launcher"
       become: no
       copy:
         dest: "~/.config/polybar/launch.sh"
