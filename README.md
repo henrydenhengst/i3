@@ -18,6 +18,7 @@ Dit project bevat de volledige configuratie voor een krachtig, Nordic-styled Dev
 ![Container](https://img.shields.io/badge/Container-Docker%20%26%20Podman-5e81ac?style=for-the-badge&logo=podman&logoColor=white)
 ![Virtualization](https://img.shields.io/badge/Virt-Vagrant%20%2F%20KVM-88c0d0?style=for-the-badge&logo=vagrant&logoColor=white)
 ![Editor](https://img.shields.io/badge/Editor-Neovim%20%26%20Vim-81a1c1?style=for-the-badge&logo=neovim&logoColor=white)
+![Status](https://img.shields.io/badge/Status-Test%20Mode-ebcb8b?style=for-the-badge&logoColor=white)
 
 ---
 
