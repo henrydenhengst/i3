@@ -11,6 +11,15 @@ ansible-playbook setup_i3.yml --ask-become-pass
 
 Dit project bevat de volledige configuratie voor een krachtig, Nordic-styled DevOps-workstation, geoptimaliseerd voor oudere hardware. Het maakt gebruik van een vederlichte i3wm-interface gecombineerd met een diepe technische toolset.
 
+![Ansible](https://img.shields.io/badge/Ansible-2.16+-5e81ac?style=for-the-badge&logo=ansible&logoColor=white)
+![OS](https://img.shields.io/badge/OS-Debian%20%2F%20Ubuntu-88c0d0?style=for-the-badge&logo=linux&logoColor=white)
+![WM](https://img.shields.io/badge/WM-i3wm-81a1c1?style=for-the-badge&logo=i3&logoColor=white)
+![Shell](https://img.shields.io/badge/Shell-Zsh%20%26%20Starship-4c566a?style=for-the-badge&logo=zsh&logoColor=white)
+![Container](https://img.shields.io/badge/Container-Docker%20%26%20Podman-5e81ac?style=for-the-badge&logo=podman&logoColor=white)
+![Virtualization](https://img.shields.io/badge/Virt-Vagrant%20%2F%20KVM-88c0d0?style=for-the-badge&logo=vagrant&logoColor=white)
+![Editor](https://img.shields.io/badge/Editor-Neovim%20%26%20Vim-81a1c1?style=for-the-badge&logo=neovim&logoColor=white)
+![Status](https://img.shields.io/badge/Status-God--Mode%20Enabled-a3be8c?style=for-the-badge)
+
 ---
 
 ## 🛠️ Belangrijkste Kenmerken
