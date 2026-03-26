@@ -18,7 +18,8 @@ ansible-playbook setup_i3.yml --ask-become-pass
 ![DevOps](https://img.shields.io/badge/DevOps-Ready-black?style=for-the-badge&logo=kubernetes&logoColor=white&color=5e81ac)
 ![Ansible](https://img.shields.io/badge/Ansible-2.16+-5e81ac?style=for-the-badge&logo=ansible)
 ![Virtualization](https://img.shields.io/badge/Vagrant-KVM/Libvirt-88c0d0?style=for-the-badge&logo=vagrant)
-
+![Podman](https://img.shields.io/badge/Podman-Daemonless-88c0d0?style=for-the-badge&logo=podman)
+![Distrobox](https://img.shields.io/badge/Distrobox-Ready-5e81ac?style=for-the-badge)
 
 Dit Ansible playbook bouwt een volledig functioneel DevOps-station met een focus op Sysadmin-workflow en esthetiek.
 
