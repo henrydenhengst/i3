@@ -1,6 +1,11 @@
+Installeer vanuit Ansible 
+
 ```bash
 ansible-playbook setup_i3.yml --ask-become-pass
 ```
+
+[Bekijk de sneltoetsen](sneltoetsen.md)
+
 
 # Functionele Beschrijving: Nordic DevOps & Sysadmin Workstation
 
