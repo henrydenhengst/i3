@@ -1,0 +1,112 @@
+- hosts: localhost
+  become: true
+
+  vars:
+    enable_docker: true
+    enable_kubernetes: true
+    enable_terraform: true
+    enable_vagrant: false
+    enable_utils: true
+
+    bin_dir: /usr/local/bin
+
+  tasks:
+
+  # -------------------------
+  # Base tools (altijd handig)
+  # -------------------------
+  - name: Install base CLI tools
+    package:
+      name:
+        - curl
+        - wget
+        - git
+        - unzip
+        - tar
+        - htop
+        - jq
+        - ripgrep
+        - fd
+        - neovim
+      state: present
+    when: enable_utils
+
+  # -------------------------
+  # Docker (official)
+  # -------------------------
+  - name: Install Docker (official script)
+    shell: curl -fsSL https://get.docker.com | sh
+    when: enable_docker
+
+  - name: Enable Docker
+    systemd:
+      name: docker
+      state: started
+      enabled: true
+    when: enable_docker
+
+  # -------------------------
+  # kubectl (official binary)
+  # -------------------------
+  - name: Install kubectl
+    get_url:
+      url: https://dl.k8s.io/release/v1.29.0/bin/linux/amd64/kubectl
+      dest: "{{ bin_dir }}/kubectl"
+      mode: '0755'
+    when: enable_kubernetes
+
+  # -------------------------
+  # k9s (nice TUI for k8s)
+  # -------------------------
+  - name: Install k9s
+    unarchive:
+      src: https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_amd64.tar.gz
+      dest: "{{ bin_dir }}"
+      remote_src: yes
+      extra_opts: [--strip-components=1]
+    when: enable_kubernetes
+
+  # -------------------------
+  # Terraform (official)
+  # -------------------------
+  - name: Install Terraform
+    unarchive:
+      src: https://releases.hashicorp.com/terraform/1.7.5/terraform_1.7.5_linux_amd64.zip
+      dest: "{{ bin_dir }}"
+      remote_src: yes
+    when: enable_terraform
+
+  # -------------------------
+  # Vagrant (official)
+  # -------------------------
+  - name: Install Vagrant
+    unarchive:
+      src: https://releases.hashicorp.com/vagrant/2.4.0/vagrant_2.4.0_linux_amd64.zip
+      dest: "{{ bin_dir }}"
+      remote_src: yes
+    when: enable_vagrant
+
+  # -------------------------
+  # Helm (Kubernetes package manager)
+  # -------------------------
+  - name: Install Helm
+    shell: |
+      curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+    when: enable_kubernetes
+
+  # -------------------------
+  # LazyDocker (bonus)
+  # -------------------------
+  - name: Install lazydocker
+    shell: |
+      curl https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
+    when: enable_docker
+
+  # -------------------------
+  # Permissions sanity
+  # -------------------------
+  - name: Ensure binaries are executable
+    file:
+      path: "{{ bin_dir }}"
+      mode: '0755'
+      recurse: yes
