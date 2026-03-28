@@ -1,35 +1,27 @@
 ---
-- name: Complete i3 + LightDM + Nord Workstation (1 script)
+- name: ULTIMATE i3 + LightDM + Nord + DevOps Workstation (Alles-in-één)
   hosts: localhost
   become: true
   vars:
+    # FLAGS - pas aan!
     enable_gui: true
-    enable_browser: true  
-    enable_docker: true
-    enable_vagrant: false
-    browser_preference: "falkon"  # falkon | firefox
+    enable_browser: true
+    enable_devops: true
+    browser_choice: "falkon"  # falkon | firefox
 
-    nord_colors:
-      bg: "#2E3440"
-      fg: "#D8DEE9"
-      black: "#3B4252"
-      red: "#BF616A"
-      green: "#A3BE8C"
-      yellow: "#EBCB8B"
-      blue: "#81A1C1"
-      magenta: "#B48EAD"
-      cyan: "#88C0D0"
-      white: "#ECEFF4"
+    # USER SETUP
+    username: "{{ ansible_user }}"
+    userhome: "{{ ansible_env.HOME }}"
 
   tasks:
-    - name: Detect OS
+    - name: OS detectie
       set_fact:
         is_debian: "{{ ansible_facts.os_family == 'Debian' }}"
         is_redhat: "{{ ansible_facts.os_family == 'RedHat' }}"
         is_arch: "{{ ansible_facts.distribution == 'Archlinux' }}"
         is_alpine: "{{ ansible_facts.distribution == 'Alpine' }}"
 
-    - name: Update packages
+    - name: Update alles
       block:
         - apt: update_cache=yes cache_valid_time=3600
           when: is_debian
@@ -40,10 +32,12 @@
         - apk: update_cache=yes
           when: is_alpine
 
-    # CORE DESKTOP: i3 + LightDM + kitty + dmenu
-    - name: Install desktop packages
+    ########################################
+    # 1. GUI DESKTOP: LightDM + i3 + Kitty #
+    ########################################
+    - name: GUI Stack (LightDM + i3 + Kitty)
       block:
-        - name: Debian/Ubuntu
+        - name: DEBIAN GUI
           apt:
             name:
               - i3
@@ -54,10 +48,12 @@
               - feh
               - xserver-xorg
               - dbus-x11
+              - fonts-jetbrains-mono
+              - nerd-fonts-jetbrains-mono
             state: present
           when: is_debian
 
-        - name: RedHat/Fedora  
+        - name: REDHAT GUI
           dnf:
             name:
               - i3
@@ -68,10 +64,11 @@
               - feh
               - xorg-x11-server-Xorg
               - dbus-x11
+              - jetbrains-mono-fonts
             state: present
           when: is_redhat
 
-        - name: Arch
+        - name: ARCH GUI
           pacman:
             name:
               - i3-wm
@@ -81,10 +78,11 @@
               - kitty
               - feh
               - xorg
+              - ttf-jetbrains-mono-nerd
             state: present
           when: is_arch
 
-        - name: Alpine (community repo)
+        - name: ALPINE GUI
           apk:
             name:
               - i3wm
@@ -94,6 +92,7 @@
               - kitty
               - feh
               - dbus
+              - ttf-jetbrains-mono-nerd
             repositories:
               - http://dl-cdn.alpinelinux.org/alpine/edge/community
             state: present
@@ -101,21 +100,20 @@
       when: enable_gui
 
     # BROWSER
-    - name: Install browser
+    - name: Browser install
       block:
-        - block:
+        - block_ini:
             - apt: name=falkon state=present
               when: is_debian
-            - dnf: name=falkon state=present  
+            - dnf: name=falkon state=present
               when: is_redhat
             - pacman: name=falkon state=present
               when: is_arch
-            - apk:
-                name=falkon
+            - apk: 
+                name=falkon 
                 repositories: - http://dl-cdn.alpinelinux.org/alpine/edge/community
               when: is_alpine
-          when: browser_preference == "falkon"
-
+          when: browser_choice == "falkon"
         - block:
             - apt: name=firefox-esr state=present
               when: is_debian
@@ -125,126 +123,269 @@
               when: is_arch
             - apk: name=firefox state=present
               when: is_alpine
-          when: browser_preference == "firefox"
+          when: browser_choice == "firefox"
       when: enable_gui and enable_browser
 
-    # DOCKER (official)
-    - name: Docker Debian
+    ########################################
+    # 2. DEVOPS CLI STACK                  #
+    ########################################
+    - name: DevOps essentials
       block:
-        - apt_key:
-            url: https://download.docker.com/linux/ubuntu/gpg
-            keyring: /usr/share/keyrings/docker-archive-keyring.gpg
-        - apt_repository:
-            repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_facts.distribution_release }} stable"
-            state: present
-        - apt:
+        - name: CORE TOOLS
+          package:
             name:
-              - docker-ce
-              - docker-ce-cli
-              - containerd.io
-              - docker-buildx-plugin
-              - docker-compose-plugin
-            update_cache: yes
-      when: is_debian and enable_docker
+              - git
+              - curl
+              - wget
+              - jq
+              - htop
+              - tmux
+              - neovim
+              - fzf
+              - bat
+              - ripgrep
+              - tree
+              - rsync
+              - unzip
+            state: present
+          when: is_debian or is_redhat or is_arch
+        - apk:
+            name:
+              - git curl wget jq htop tmux neovim fzf bat ripgrep tree rsync unzip
+            repositories: - http://dl-cdn.alpinelinux.org/alpine/edge/community
+            state: present
+          when: is_alpine
+      when: enable_devops
 
-    - name: Docker RedHat/Arch/Alpine  
-      package:
-        name:
-          - docker
-          - docker-compose
-        state: present
-      when: (is_redhat or is_arch or is_alpine) and enable_docker
+    - name: Docker official
+      block:
+        - block:
+            - apt_key:
+                url: https://download.docker.com/linux/ubuntu/gpg
+                keyring: /usr/share/keyrings/docker-archive-keyring.gpg
+            - apt_repository:
+                repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_facts.distribution_release }} stable"
+                state: present
+            - apt:
+                name:
+                  - docker-ce-cli
+                  - docker-compose-plugin
+                update_cache: yes
+          when: is_debian
+        - package:
+            name: 
+              - docker
+              - docker-compose
+            state: present
+          when: is_redhat or is_arch or is_alpine
+      when: enable_devops
 
-    # NORD THEME + CONFIGS
-    - name: Config dirs
-      file:
-        path: "{{ item }}"
-        state: directory
-      loop:
-        - ~/.config/i3
-        - ~/.config/kitty
+    ########################################
+    # 3. NORD LOOK & FEEL + USABILITY      #
+    ########################################
+    - name: Perfect user setup
+      block:
+        - name: User dirs
+          file:
+            path: "{{ item }}"
+            state: directory
+          loop:
+            - "{{ userhome }}/.config/i3"
+            - "{{ userhome }}/.config/kitty" 
+            - "{{ userhome }}/Pictures"
+            - "{{ userhome }}/.local/bin"
+
+        # ULTIMATE i3 CONFIG (Nord + shortcuts)
+        - name: i3 config - Perfect UX
+          copy:
+            content: |
+              # ═══════════════════════════════════════════════════════════════
+              # i3 + NORD + POWER USER SHORTCUTS ({{ username }})
+              # ═══════════════════════════════════════════════════════════════
+              
+              set $mod Mod4
+              
+              # NORD COLORS
+              set $bg     #2E3440
+              set $fg     #D8DEE9
+              set $black  #3B4252
+              set $blue   #81A1C1
+              set $green  #A3BE8C
+              set $red    #BF616A
+              set $yellow #EBCB8B
+              
+              # BAR (i3bar + i3status)
+              bar {
+                  status_command i3status
+                  position top
+                  colors {
+                      background $bg
+                      statusline $fg
+                      separator $black
+                      
+                      focused_workspace  $bg $blue $fg
+                      active_workspace   $black $bg $fg
+                      inactive_workspace $black $bg $black
+                      urgent_workspace   $red $bg $red
+                  }
+              }
+              
+              # WALLPAPER
+              exec_always feh --bg-scale {{ userhome }}/Pictures/nord-wallpaper.png
+              
+              # LAUNCHERS (dmenu_run = beste UX)
+              bindsym $mod+d exec dmenu_run -i -p "➤ "
+              bindsym $mod+Shift+d exec dmenu_run -i -p "➤ Kill: " -fn "JetBrains Mono:size=14"
+              
+              # TERMINALS (Kitty = snelste)
+              bindsym $mod+Return exec kitty
+              bindsym $mod+Shift+Return exec kitty --working-directory ~
+              
+              # BROWSER
+              bindsym $mod+b exec {{ 'falkon' if browser_choice == 'falkon' else 'firefox' }}
+              
+              # WORKSPACES 1-9 (muscle memory)
+              {% for i in range(1,10) %}
+              bindsym $mod+{{ i }} workspace number {{ i }}
+              bindsym $mod+Shift+{{ i }} move container to workspace number {{ i }}
+              {% endfor %}
+              
+              # WINDOW MANAGEMENT
+              bindsym $mod+h focus left
+              bindsym $mod+j focus down
+              bindsym $mod+k focus up
+              bindsym $mod+l focus right
+              
+              bindsym $mod+Shift+h move left
+              bindsym $mod+Shift+j move down
+              bindsym $mod+Shift+k move up
+              bindsym $mod+Shift+l move right
+              
+              bindsym $mod+f fullscreen toggle
+              bindsym $mod+Shift+q kill
+              bindsym $mod+q kill
+              
+              # LAYOUT
+              bindsym $mod+s layout stacking
+              bindsym $mod+w layout tabbed
+              bindsym $mod+e layout toggle split
+              bindsym $mod+r layout toggle split
+              
+              # i3 CONTROLS
+              bindsym $mod+Shift+c reload
+              bindsym $mod+Shift+r restart
+              bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit i3?' -B 'Yes' 'i3-msg exit'"
+              
+              # SYSTEM
+              bindsym $mod+Shift+l exec loginctl lock-session
+              bindsym Print exec flameshot gui  # screenshot tool
+            dest: "{{ userhome }}/.config/i3/config"
+
+        # KITTY - Perfect font + Nord
+        - name: Kitty config
+          copy:
+            content: |
+              # Kitty + Nord + JetBrains Mono Nerd Font
+              font_family      JetBrainsMono Nerd Font
+              font_size        13
+              
+              background_opacity 0.92
+              
+              # NORD 16 COLORS
+              background #2E3440
+              foreground #D8DEE9
+              
+              # Kitty theme (Nord)
+              selection_foreground #D8DEE9
+              selection_background #81A1C1
+              url_color #81A1C1
+              cursor #D8DEE9
+              cursor_text_color #2E3440
+              
+              # 16 colors
+              color0  #3B4252  # black
+              color1  #BF616A  # red
+              color2  #A3BE8C  # green
+              color3  #EBCB8B  # yellow
+              color4  #81A1C1  # blue
+              color5  #B48EAD  # magenta
+              color6  #88C0D0  # cyan
+              color7  #ECEFF4  # white
+              color8  #4C566A
+              color9  #BF616A
+              color10 #A3BE8C
+              color11 #EBCB8B
+              color12 #81A1C1
+              color13 #B48EAD
+              color14 #8FBCBB
+              color15 #ECEFF4
+              
+              # Kitty kitten-themes support
+              include ./current-theme.conf
+              
+              # Tabs
+              tab_bar_style powerline
+              tab_powerline_style slanted
+              
+              # Scrollback
+              scrollback_lines 10000
+            dest: "{{ userhome }}/.config/kitty/kitty.conf"
+
+        # NORD WALLPAPER
+        - name: Download Nord wallpaper
+          get_url:
+            url: https://raw.githubusercontent.com/arcticicestudio/nord-wallpapers/master/4K/Nordic%20Landscape.png
+            dest: "{{ userhome }}/Pictures/nord-wallpaper.png"
+
+        # ZSH + OH-MY-ZSH + Starship (beste shell UX)
+        - name: Zsh + Oh My Zsh
+          shell: sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+          args:
+            creates: "{{ userhome }}/.oh-my-zsh"
+
+        - name: Starship prompt
+          shell: curl -sS https://starship.rs/install.sh | sh -s -- -b /usr/local/bin
+          args:
+            creates: /usr/local/bin/starship
+
+        # .zshrc - Perfect prompt + aliases
+        - name: Zshrc met starship + aliases
+          copy:
+            content: |
+              # Starship prompt
+              eval "$(starship init zsh)"
+              
+              # DevOps aliases
+              alias ll='ls -alFh'
+              alias la='ls -A'
+              alias l='ls -CF'
+              alias ..='cd ..'
+              alias ...='cd ../..'
+              
+              alias dc='docker compose'
+              alias dcu='docker compose up -d'
+              alias dcd='docker compose down'
+              
+              alias k='kubectl'
+              alias tf='terraform'
+              
+              # Git
+              alias ga='git add .'
+              alias gc='git commit -m'
+              alias gp='git push'
+              
+              # Kitty kitten-themes
+              alias kitty-theme="kitty +kitten themes --reload-config"
+            dest: "{{ userhome }}/.zshrc"
+          notify: reload shell
+
+      become_user: "{{ username }}"
       when: enable_gui
 
-    - name: i3 config (Nord)
-      copy:
-        content: |
-          # i3 config - Nord themed
-          set $mod Mod4
-          
-          # Nord colors
-          set $bg     #2E3440
-          set $fg     #D8DEE9  
-          set $black  #3B4252
-          set $red    #BF616A
-          set $green  #A3BE8C
-          set $yellow #EBCB8B
-          set $blue   #81A1C1
-          set $cyan   #88C0D0
-
-          # bar colors
-          bar {
-              status_command i3status
-              colors {
-                  background $bg
-                  statusline $fg
-                  focused_workspace  $blue $bg $fg
-                  active_workspace   $black $bg $white
-                  inactive_workspace $black $bg $black
-                  urgent_workspace   $red $bg $red
-              }
-          }
-
-          # Wallpaper
-          exec_always --no-startup-id feh --bg-scale ~/Pictures/nord-wallpaper.png
-
-          # Keybindings
-          bindsym $mod+Return exec kitty
-          bindsym $mod+d exec dmenu_run
-          bindsym $mod+Shift+q kill
-          bindsym $mod+q kill
-          bindsym $mod+Shift+c reload
-          bindsym $mod+Shift+r restart
-          bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit i3?' -B 'Yes' 'i3-msg exit'"
-          
-          # Workspaces
-          {% for i in range(1, 10) %}
-          bindsym $mod+{{ i }} workspace number {{ i }}
-          {% endfor %}
-        dest: ~/.config/i3/config
-
-    - name: Kitty config (Nord)
-      copy:
-        content: |
-          background #2E3440
-          foreground #D8DEE9
-          cursor #D8DEE9
-          
-          # Kitty nord theme
-          color0  #3B4252
-          color1  #BF616A
-          color2  #A3BE8C
-          color3  #EBCB8B
-          color4  #81A1C1
-          color5  #B48EAD
-          color6  #88C0D0
-          color7  #ECEFF4
-          color8  #4C566A
-          color9  #BF616A
-          color10 #A3BE8C
-          color11 #EBCB8B
-          color12 #81A1C1
-          color13 #B48EAD
-          color14 #8FBCBB
-          color15 #ECEFF4
-        dest: ~/.config/kitty/kitty.conf
-
-    - name: Nord wallpaper
-      get_url:
-        url: https://raw.githubusercontent.com/arcticicestudio/nord-wallpapers/master/4K/Nordic%20Landscape.png
-        dest: ~/Pictures/nord-wallpaper.png
-
-    # SERVICES
-    - name: Enable services
+    ########################################
+    # 4. SERVICES & GROUPS                 #
+    ########################################
+    - name: Services starten
       systemd:
         name: "{{ item }}"
         enabled: true
@@ -253,17 +394,16 @@
         - lightdm
         - docker
       when: 
-        - enable_gui or enable_docker
+        - enable_gui or enable_devops
         - item == 'lightdm' or item == 'docker'
 
-    - name: Docker group
+    - name: User groups (docker, sudo)
       user:
-        name: "{{ ansible_user }}"
-        groups: docker
+        name: "{{ username }}"
+        groups: docker,wheel
         append: yes
-      when: enable_docker
 
   handlers:
-    - name: Reload i3
-      shell: i3-msg reload
-      ignore_errors: yes
+    - name: Reload shell
+      shell: newgrp docker && exec zsh
+      become_user: "{{ username }}"
