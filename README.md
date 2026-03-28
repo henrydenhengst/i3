@@ -23,4 +23,4 @@ Dat is niet wat ik bedoel met snel noch eenvoudig.
 
 Zou je je hierin willen verbeteren?
 
-De resultaten zijn te vinden in hun respectievelijke directory.
+*De resultaten zijn te vinden in hun respectievelijke directory.*
