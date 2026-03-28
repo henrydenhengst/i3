@@ -1,1 +1,4 @@
-test
+```bash
+chmod +x setup.sh
+./setup.sh
+```
