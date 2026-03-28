@@ -55,6 +55,27 @@
 ![Maintenance](https://img.shields.io/badge/Maintained-Yes-green?style=flat-square)
 ![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen?style=flat-square)
 
+<!-- Zsh Main Badges -->
+![Zsh](https://img.shields.io/badge/Shell-Zsh-F15A24?style=for-the-badge&logo=zsh&logoColor=white)
+![Oh My Zsh](https://img.shields.io/badge/Oh_My_Zsh-1A2C3E?style=for-the-badge&logo=ohmyzsh&logoColor=white)
+![Powerlevel10k](https://img.shields.io/badge/Powerlevel10k-2E3440?style=for-the-badge)
+
+<!-- Zsh Features -->
+![Zsh Autosuggestions](https://img.shields.io/badge/Autosuggestions-Enabled-2E3440?style=flat-square)
+![Zsh Syntax Highlighting](https://img.shields.io/badge/Syntax_Highlighting-Enabled-2E3440?style=flat-square)
+![Zsh History](https://img.shields.io/badge/History-Substring-2E3440?style=flat-square)
+
+<!-- Zsh Plugins -->
+![zsh-autosuggestions](https://img.shields.io/badge/Plugin-Autosuggestions-2E3440?style=flat-square)
+![zsh-syntax-highlighting](https://img.shields.io/badge/Plugin-Syntax_Highlighting-2E3440?style=flat-square)
+![zsh-history-substring-search](https://img.shields.io/badge/Plugin-History_Search-2E3440?style=flat-square)
+
+<!-- Zsh Theme -->
+![Nord Zsh](https://img.shields.io/badge/Theme-Nord_Zsh-88C0D0?style=flat-square)
+![Powerlevel10k Nord](https://img.shields.io/badge/Powerlevel10k-Nord-88C0D0?style=flat-square)
+
+
+
 # Opdracht WM voor DevOps / SysAmin
 
 ## Context
