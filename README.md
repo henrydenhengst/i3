@@ -16,10 +16,6 @@
 ![dmenu](https://img.shields.io/badge/dmenu-2E3440?style=flat-square&logo=linux&logoColor=white)
 ![LightDM](https://img.shields.io/badge/LightDM-00A67C?style=flat-square)
 
-<!-- Compositor -->
-![Picom](https://img.shields.io/badge/Picom-2E3440?style=flat-square)
-![No Compositor](https://img.shields.io/badge/Compositor-Disabled-2E3440?style=flat-square&logo=power-off&logoColor=red)
-
 ![Firefox](https://img.shields.io/badge/Firefox-FF7139?style=flat-square&logo=firefox-browser&logoColor=white)
 ![Falkon](https://img.shields.io/badge/Falkon-4A90E2?style=flat-square&logo=qt&logoColor=white)
 
