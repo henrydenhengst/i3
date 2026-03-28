@@ -1,23 +1,21 @@
 mkdir -p ansible-nord-setup/roles/{common,gui,nord_theme}/tasks && cd ansible-nord-setup
 
-# 1. Maak de Inventory
+# 1. Inventory & Vars
 cat <<EOF > inventory.ini
 [workstation]
 localhost ansible_connection=local
 EOF
 
-# 2. Maak de Variabelen (Feature Flags & Config)
 cat <<EOF > group_vars/all.yml
 ---
 enable_gui: true
 enable_browser: true
-enable_vagrant: true
 enable_docker: true
 browser_choice: "falkon"
 nord_wallpaper: "https://raw.githubusercontent.com/linuxdotexe/nordic-wallpapers/master/wallpapers/ign_nord.png"
 EOF
 
-# 3. Maak het Hoofdplaybook
+# 2. Hoofdplaybook
 cat <<EOF > playbook.yml
 ---
 - name: Modular Nord Setup
@@ -29,26 +27,32 @@ cat <<EOF > playbook.yml
     - { role: nord_theme, when: enable_gui }
 EOF
 
-# 4. Maak de Rollen (Common, GUI, Theme)
+# 3. Role: Common (DevOps & Tools)
 cat <<EOF > roles/common/tasks/main.yml
-- name: Install Base DevOps Tools
+- name: Install Base Tools
   package:
-    name: [curl, git, vim, unzip]
+    name: [curl, git, vim, unzip, wget]
     state: present
 
-- name: Docker Setup (Official Repo)
+- name: Install Docker via Official Script
   shell: curl -fsSL https://get.docker.com | sh
   when: enable_docker
   args: { creates: /usr/bin/docker }
 EOF
 
+# 4. Role: GUI (i3, LightDM & Browser)
 cat <<EOF > roles/gui/tasks/main.yml
-- name: Install i3 and LightDM
+- name: Install i3, LightDM and Kitty
   package:
-    name: [i3-wm, lightdm, kitty]
+    name: [i3-wm, lightdm, lightdm-gtk-greeter, kitty, feh]
     state: present
 
-- name: Install Browser (Falkon with Firefox fallback)
+- name: Enable LightDM Service
+  service:
+    name: lightdm
+    enabled: yes
+
+- name: Ensure Falkon or Firefox
   block:
     - package: { name: falkon, state: present }
       when: browser_choice == "falkon"
@@ -57,15 +61,35 @@ cat <<EOF > roles/gui/tasks/main.yml
   when: enable_browser
 EOF
 
+# 5. Role: Nord Theme (Styling & Configs)
 cat <<EOF > roles/nord_theme/tasks/main.yml
-- name: Apply Nord Colors to Kitty
+- name: Create Config Dirs
+  file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - ~/.config/i3
+    - ~/.config/kitty
+
+- name: Configure i3 with Nord Theme
+  copy:
+    dest: ~/.config/i3/config
+    content: |
+      set \$bg #2e3440
+      set \$fg #d8dee9
+      client.focused #88c0d0 #81a1c1 #2e3440 #88c0d0
+      exec --no-startup-id feh --bg-fill {{ nord_wallpaper }}
+      bindsym Mod4+Return exec kitty
+      bindsym Mod4+Shift+q kill
+      bar { colors { background #2e3440 } }
+
+- name: Configure Kitty with Nord
   copy:
     dest: ~/.config/kitty/kitty.conf
     content: |
       background #2e3440
       foreground #d8dee9
-      selection_background #4c566a
-      color0 #3b4252
+      font_family family="Fira Code"
 EOF
 
-echo "Klaar! Je mappenstructuur staat in $(pwd)"
+echo "Klaar! Start de installatie met: ansible-playbook -i inventory.ini playbook.yml -K"
