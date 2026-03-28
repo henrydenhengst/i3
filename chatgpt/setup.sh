@@ -16,7 +16,7 @@ if ! command -v ansible >/dev/null; then
   fi
 fi
 
-echo "[*] Creating minimal playbook..."
+echo "[*] Creating playbook..."
 
 cat > site.yml <<'EOF'
 - hosts: localhost
@@ -39,21 +39,44 @@ cat > site.yml <<'EOF'
           - unzip
         state: present
 
-    - name: Install i3 stack
+    - name: Install i3 + LightDM stack
       package:
         name:
           - i3
           - xorg
           - lightdm
+          - lightdm-gtk-greeter
           - dmenu
           - feh
         state: present
       when: enable_gui
 
-    - name: Enable lightdm
+    # 🔑 CRUCIAAL: default session instellen
+    - name: Configure LightDM for i3
+      copy:
+        dest: /etc/lightdm/lightdm.conf
+        content: |
+          [Seat:*]
+          user-session=i3
+          greeter-session=lightdm-gtk-greeter
+      when: enable_gui
+
+    # 🔑 CRUCIAAL: greeter config (Nord-ish)
+    - name: Configure LightDM GTK Greeter
+      copy:
+        dest: /etc/lightdm/lightdm-gtk-greeter.conf
+        content: |
+          [greeter]
+          theme-name=Adwaita-dark
+          icon-theme-name=Adwaita
+          background=/usr/share/backgrounds/nord.png
+      when: enable_gui
+
+    - name: Enable LightDM
       systemd:
         name: lightdm
         enabled: true
+        state: started
       when: enable_gui
 
     - name: Install kitty
@@ -72,6 +95,15 @@ cat > site.yml <<'EOF'
       get_url:
         url: https://raw.githubusercontent.com/arcticicestudio/nord-wallpapers/master/wallpapers/ign_astronaut.png
         dest: /usr/share/backgrounds/nord.png
+      when: enable_gui
+
+    - name: Ensure config dirs exist
+      file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - ~/.config/i3
+        - ~/.config/kitty
       when: enable_gui
 
     - name: i3 config
