@@ -1,8 +1,10 @@
 ```bash
-chmod +x setup.sh
-./setup.sh
+chmod +x bootstrap.sh
+sudo ./bootstrap.sh
 ```
 
 ```
-ansible-playbook devops-cli.yml -K
+sudo ./bootstrap.sh --no-gui
+sudo ./bootstrap.sh --browser
+sudo ./bootstrap.sh --no-docker --vagrant
 ```
