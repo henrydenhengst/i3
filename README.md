@@ -16,11 +16,6 @@
 ![dmenu](https://img.shields.io/badge/dmenu-2E3440?style=flat-square&logo=linux&logoColor=white)
 ![LightDM](https://img.shields.io/badge/LightDM-00A67C?style=flat-square)
 
-<!-- Terminal -->
-![Kitty](https://img.shields.io/badge/Kitty-000000?style=flat-square&logo=kitty&logoColor=white)
-![ST](https://img.shields.io/badge/ST-2E3440?style=flat-square&logo=linux&logoColor=white)
-![Alacritty](https://img.shields.io/badge/Alacritty-000000?style=flat-square)
-
 <!-- Compositor -->
 ![Picom](https://img.shields.io/badge/Picom-2E3440?style=flat-square)
 ![No Compositor](https://img.shields.io/badge/Compositor-Disabled-2E3440?style=flat-square&logo=power-off&logoColor=red)
