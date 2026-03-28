@@ -1,5 +1,5 @@
 ---
-- name: Nord Themed Minimal Setup (i3 + dmenu)
+- name: Nord Themed Minimal Setup (i3 + dmenu + LightDM)
   hosts: localhost
   connection: local
   become: true
@@ -45,7 +45,7 @@
     - name: Update cache
       package:
         update_cache: yes
-      when: not is_arch  # Arch updatet tijdens installatie
+      when: not is_arch
 
     # ============================================
     # 1. BASIS PAKKETTEN
@@ -68,32 +68,8 @@
         - kitty
 
     # ============================================
-    # 2. WINDOW MANAGER (i3 + dmenu)
+    # 2. X11 + WINDOW MANAGER (i3 + dmenu)
     # ============================================
-    - name: Install i3 and dmenu
-      package:
-        name: "{{ item }}"
-        state: present
-      loop:
-        - i3-wm
-        - i3status
-        - i3lock
-        - dmenu
-        - lightdm
-      when: enable_gui and not is_alpine
-
-    - name: Install for Alpine (different names)
-      package:
-        name: "{{ item }}"
-        state: present
-      loop:
-        - i3wm
-        - i3status
-        - i3lock
-        - dmenu
-        - lightdm
-      when: enable_gui and is_alpine
-
     - name: Install X11 for Debian/RedHat
       package:
         name: "{{ item }}"
@@ -109,8 +85,125 @@
         state: present
       when: enable_gui and is_arch
 
+    - name: Install i3 and dmenu (standard)
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - i3-wm
+        - i3status
+        - i3lock
+      when: enable_gui and not is_alpine and not is_arch
+
+    - name: Install i3 and dmenu (Arch)
+      pacman:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - i3-wm
+        - i3status
+        - i3lock
+        - dmenu
+      when: enable_gui and is_arch
+
+    - name: Install i3 and dmenu (Alpine)
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - i3wm
+        - i3status
+        - i3lock
+        - dmenu
+      when: enable_gui and is_alpine
+
     # ============================================
-    # 3. NORD THEMA
+    # 3. LIGHTDM (Display Manager)
+    # ============================================
+    - name: Install LightDM
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - lightdm
+        - lightdm-gtk-greeter
+      when: enable_gui and not is_alpine
+
+    - name: Install LightDM (Alpine specific)
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - lightdm
+        - lightdm-gtk-greeter
+      when: enable_gui and is_alpine
+
+    - name: Configure LightDM with i3 as default session
+      copy:
+        dest: /etc/lightdm/lightdm.conf
+        content: |
+          [Seat:*]
+          autologin-user={{ target_user }}
+          autologin-user-timeout=0
+          autologin-session=i3
+          user-session=i3
+          greeter-session=lightdm-gtk-greeter
+          session-wrapper=/etc/lightdm/Xsession
+      when: enable_gui
+
+    - name: Configure LightDM greeter with Nord theme
+      copy:
+        dest: /etc/lightdm/lightdm-gtk-greeter.conf
+        content: |
+          [greeter]
+          background={{ wallpaper_path }}
+          theme-name=Adwaita
+          icon-theme-name=Adwaita
+          font-name=Monospace 10
+          xft-antialias=true
+          xft-dpi=96
+          clock-format=%H:%M
+          indicators=~host;~spacer;~clock;~spacer;~session;~language;~power
+      when: enable_gui
+
+    - name: Create LightDM Xsession for i3
+      copy:
+        dest: /usr/share/xsessions/i3.desktop
+        content: |
+          [Desktop Entry]
+          Name=i3
+          Comment=Improved tiling window manager
+          Exec=i3
+          Type=Application
+          X-LightDM-Session=/etc/lightdm/Xsession
+      when: enable_gui
+
+    - name: Create user .dmrc for session persistence
+      copy:
+        dest: "{{ user_home }}/.dmrc"
+        owner: "{{ target_user }}"
+        mode: "0644"
+        content: |
+          [Desktop]
+          Session=i3
+      when: enable_gui
+
+    - name: Enable LightDM service
+      systemd:
+        name: lightdm
+        enabled: yes
+        state: started
+      when: enable_gui and not is_alpine
+
+    - name: Enable LightDM service (Alpine)
+      service:
+        name: lightdm
+        enabled: yes
+        state: started
+      when: enable_gui and is_alpine
+
+    # ============================================
+    # 4. NORD THEMA
     # ============================================
     - name: Create directories
       file:
@@ -123,6 +216,7 @@
         - "{{ user_home }}/.config/kitty"
         - "{{ user_home }}/.local/share/wallpapers"
         - "{{ user_home }}/.local/bin"
+      when: enable_gui
 
     - name: Download Nord wallpaper
       get_url:
@@ -131,6 +225,14 @@
         owner: "{{ target_user }}"
         mode: "0644"
       become: false
+      when: enable_gui
+
+    - name: Copy wallpaper to system location for LightDM
+      copy:
+        src: "{{ wallpaper_path }}"
+        dest: "/usr/share/backgrounds/nord_wallpaper.png"
+        remote_src: yes
+        mode: "0644"
       when: enable_gui
 
     - name: i3 config with Nord theme
@@ -168,7 +270,7 @@
           bindsym $mod+d exec dmenu_run -nb "{{ n0 }}" -nf "{{ n4 }}" -sb "{{ n8 }}" -sf "{{ n0 }}"
           bindsym $mod+Shift+q kill
           bindsym $mod+Shift+c reload
-          bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit?' -b 'Yes' 'i3-msg exit'"
+          bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit i3?' -b 'Yes' 'i3-msg exit'"
           
           bindsym $mod+h split h
           bindsym $mod+v split v
@@ -269,6 +371,7 @@
           cursor {{ n8 }}
           cursor_text_color {{ n0 }}
       become: false
+      when: enable_gui
 
     - name: Xresources for terminal colors
       copy:
@@ -297,6 +400,7 @@
           *color14: {{ n7 }}
           *color15: {{ n6 }}
       become: false
+      when: enable_gui
 
     - name: Vim config
       copy:
@@ -309,6 +413,7 @@
           set background=dark
           colorscheme desert
       become: false
+      when: enable_gui
 
     - name: Tmux config
       copy:
@@ -321,9 +426,10 @@
           set -g status-left '#[fg=green]#H'
           set -g status-right '#[fg=yellow]#(uptime | cut -d " " -f 4-5)'
       become: false
+      when: enable_gui
 
     # ============================================
-    # 4. BROWSER
+    # 5. BROWSER
     # ============================================
     - name: Install Firefox
       package:
@@ -338,7 +444,7 @@
       when: enable_gui and browser == "falkon"
 
     # ============================================
-    # 5. DEVOPS STACK (officiële bronnen)
+    # 6. DEVOPS STACK (officiële bronnen)
     # ============================================
     - name: Install Docker (official)
       block:
@@ -424,12 +530,13 @@
       when: enable_vagrant
 
     # ============================================
-    # 6. AFMELDING
+    # 7. FINALISATIE
     # ============================================
     - name: Apply Xresources
       shell: xrdb -merge {{ user_home }}/.Xresources
       become: false
       ignore_errors: yes
+      when: enable_gui
 
     - name: Done
       debug:
@@ -438,6 +545,7 @@
           ✅ Installatie voltooid!
           
           Wat er is geïnstalleerd:
+          - LightDM (display manager) met Nord wallpaper
           - i3 + dmenu (window manager)
           - Kitty terminal (Nord theme)
           - Browser: {{ browser }}
@@ -445,11 +553,16 @@
           - Vagrant: {{ 'ja' if enable_vagrant else 'nee' }}
           
           🔧 Gebruik:
-          - Inloggen: kies "i3" bij de login manager
-          - Of typ: startx (na inloggen in console)
+          - Bij opstarten zie je LightDM met Nord wallpaper
+          - Login met je gebruiker, i3 start automatisch
+          - Of bij console: startx (als fallback)
           
-          🎨 Shortcuts:
+          🎨 Shortcuts in i3:
           - Mod (Windows-toets) + Enter = terminal
           - Mod + d = dmenu (app launcher)
           - Mod + Shift + c = herlaad i3 config
           - Mod + Shift + e = exit i3
+          
+          💡 Na installatie:
+          - Herstart de machine: sudo reboot
+          - Of start LightDM handmatig: sudo systemctl start lightdm
