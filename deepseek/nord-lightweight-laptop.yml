@@ -1,0 +1,761 @@
+---
+- name: 💻 Nord Lightweight Laptop - Minimal Setup
+  hosts: localhost
+  connection: local
+  become: true
+  vars:
+    # ============================================
+    # 🎯 INSTELLINGEN - Pas aan voor jouw laptop
+    # ============================================
+    target_user: "{{ ansible_user_id }}"
+    
+    # 💾 RESOURCE BESPARENDE INSTELLINGEN
+    enable_gui: true
+    enable_autologin: true
+    browser: "firefox"           # firefox of falkon (falkon is lichter)
+    use_compositor: false        # picom uitschakelen = meer performance
+    use_status_bar: true         # i3status bar (lichtgewicht)
+    
+    # 🐳 LICHTWEIGHT DEVOPS (alleen essentiële tools)
+    enable_docker: true          # Docker is handig, maar zet uit als je het niet nodig hebt
+    enable_vagrant: false        # Vagrant is zwaar, uitzetten
+    
+    # ☸️ KUBERNETES (alleen als je het echt nodig hebt)
+    install_kubectl: false       # Zwaar, uitzetten als je geen k8s gebruikt
+    install_helm: false
+    install_k9s: false
+    install_kind: false
+    
+    # 🏗️ HASHICORP (zwaar, alleen als nodig)
+    install_terraform: false
+    install_packer: false
+    install_vault: false
+    
+    # ☁️ CLOUD CLI'S (alleen wat je nodig hebt)
+    install_aws_cli: false
+    install_azure_cli: false
+    install_gcloud_cli: false
+    
+    # 🛠️ LICHTWEIGHT MODERNE TOOLS (selectief)
+    install_fzf: true            # Lichtgewicht, blijft aan
+    install_ripgrep: true       # Lichtgewicht, blijft aan
+    install_fd: true            # Lichtgewicht, blijft aan
+    install_bat: true           # Lichtgewicht, blijft aan
+    install_lazygit: false      # Optioneel, niet super zwaar
+    install_tldr: false         # Licht, maar npm install kan traag zijn
+    install_htop: true          # Essentieel, blijft aan
+    
+    # 🔋 POWER MANAGEMENT (voor laptops)
+    enable_power_saving: true   # TLP voor batterij optimalisatie
+    enable_network_manager: true # Netwerkbeheer
+    
+    # 🎨 NORD THEMA KLEUREN
+    n0: "#2E3440"
+    n1: "#3B4252"
+    n2: "#434C5E"
+    n3: "#4C566A"
+    n4: "#D8DEE9"
+    n5: "#E5E9F0"
+    n6: "#ECEFF4"
+    n7: "#8FBCBB"
+    n8: "#88C0D0"
+    n9: "#81A1C1"
+    n10: "#5E81AC"
+    n11: "#BF616A"
+    n12: "#D08770"
+    n13: "#EBCB8B"
+    n14: "#A3BE8C"
+    n15: "#B48EAD"
+    
+    # PADEN
+    user_home: "/home/{{ target_user }}"
+    wallpaper_url: "https://raw.githubusercontent.com/nordtheme/assets/main/wallpapers/mountains/everforest.png"
+    wallpaper_path: "{{ user_home }}/.local/share/wallpapers/nord.png"
+    local_bin: "{{ user_home }}/.local/bin"
+    temp_dir: "/tmp/nord-lightweight"
+
+  tasks:
+    # ============================================
+    # 🚀 PRETASKS - Welkomstbericht
+    # ============================================
+    - name: 🎬 Starting Lightweight Laptop Setup
+      ansible.builtin.debug:
+        msg: |
+          ╔══════════════════════════════════════════════════════════════════╗
+          ║                                                                  ║
+          ║     💻 NORD LIGHTWEIGHT LAPTOP - MINIMAL SETUP 🚀                ║
+          ║                                                                  ║
+          ║     Optimized for battery life and performance                   ║
+          ║     Perfect for older hardware or resource-constrained laptops   ║
+          ║                                                                  ║
+          ╚══════════════════════════════════════════════════════════════════╝
+          
+          📋 Lightweight Configuration:
+          ────────────────────────────────────────────────────────────────────
+          👤 User: {{ target_user }}
+          🖥️  GUI: i3 + LightDM (Nord themed)
+          🎨 Compositor: {{ '❌ Disabled (better performance)' if not use_compositor else '✅ Enabled' }}
+          🌐 Browser: {{ browser | upper }} ({{ 'lightweight' if browser == 'falkon' else 'standard' }})
+          🐳 Docker: {{ '✅' if enable_docker else '❌' }}
+          
+          🛠️ Light Tools: fzf ✅ | ripgrep ✅ | fd ✅ | bat ✅
+          🔋 Power Saving: {{ '✅ TLP enabled' if enable_power_saving else '❌' }}
+          ────────────────────────────────────────────────────────────────────
+
+    - name: 🔍 Detecting hardware and OS
+      set_fact:
+        is_debian: "{{ ansible_os_family == 'Debian' }}"
+        is_redhat: "{{ ansible_os_family == 'RedHat' }}"
+        is_arch: "{{ ansible_distribution == 'Archlinux' }}"
+        is_ubuntu: "{{ ansible_distribution == 'Ubuntu' }}"
+        cpu_cores: "{{ ansible_processor_cores | default(1) }}"
+        total_ram_mb: "{{ ansible_memtotal_mb }}"
+
+    - name: 📊 System assessment
+      debug:
+        msg: |
+          💻 Hardware Assessment:
+          ────────────────────────────────────────────────────────────────────
+          🧠 CPU Cores: {{ cpu_cores }}
+          💾 RAM: {{ total_ram_mb }} MB
+          🎯 Profile: 
+          {% if total_ram_mb < 2048 %}⚠️  Low RAM - Running in ultra-light mode
+          {% elif total_ram_mb < 4096 %}✅ Medium RAM - Optimized for battery life
+          {% else %}🌟 Good RAM - Full lightweight experience{% endif %}
+
+    - name: 📁 Creating local directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ target_user }}"
+        mode: "0755"
+      loop:
+        - "{{ user_home }}/.config"
+        - "{{ user_home }}/.local/bin"
+        - "{{ user_home }}/.local/share/wallpapers"
+        - "{{ temp_dir }}"
+
+    - name: 🔄 Updating package cache (once)
+      package:
+        update_cache: yes
+      when: not is_arch
+
+    # ============================================
+    # 📦 MINIMAL CORE PACKAGES
+    # ============================================
+    - name: 📦 Installing minimal core packages
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - wget
+        - git
+        - vim-tiny
+        - htop
+        - tmux
+        - unzip
+        - tar
+        - ca-certificates
+      when: is_debian
+
+    - name: 📦 Installing minimal core packages (RedHat)
+      dnf:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - wget
+        - git
+        - vim-minimal
+        - htop
+        - tmux
+        - unzip
+        - tar
+        - ca-certificates
+      when: is_redhat
+
+    - name: 📦 Installing minimal core packages (Arch)
+      pacman:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - wget
+        - git
+        - vim
+        - htop
+        - tmux
+        - unzip
+        - tar
+        - ca-certificates
+      when: is_arch
+
+    # ============================================
+    # 🖥️ LICHTWEIGHT GUI SETUP (geen compositor)
+    # ============================================
+    - name: 🖥️ Installing lightweight GUI
+      block:
+        - name: Installing minimal X11 and i3 (without compositor)
+          package:
+            name: "{{ item }}"
+            state: present
+          loop:
+            - xorg
+            - xinit
+            - i3-wm
+            - i3status
+            - i3lock
+            - dmenu
+            - lightdm
+            - lightdm-gtk-greeter
+            - feh
+          when: not is_arch
+
+        - name: Installing GUI packages (Arch)
+          pacman:
+            name: "{{ item }}"
+            state: present
+          loop:
+            - xorg
+            - xorg-xinit
+            - i3-wm
+            - i3status
+            - i3lock
+            - dmenu
+            - lightdm
+            - lightdm-gtk-greeter
+            - feh
+          when: is_arch
+
+        - name: Installing lightweight terminal (st instead of kitty for low RAM)
+          package:
+            name: st
+            state: present
+          when: total_ram_mb < 2048
+
+        - name: Installing kitty terminal (for systems with >2GB RAM)
+          package:
+            name: kitty
+            state: present
+          when: total_ram_mb >= 2048
+
+        - name: Creating i3 config directory
+          file:
+            path: "{{ user_home }}/.config/i3"
+            state: directory
+            owner: "{{ target_user }}"
+            mode: "0755"
+
+        - name: 🎨 Downloading Nord wallpaper
+          get_url:
+            url: "{{ wallpaper_url }}"
+            dest: "{{ wallpaper_path }}"
+            owner: "{{ target_user }}"
+            mode: "0644"
+          become: false
+
+        - name: 🎨 Configuring LightDM (minimal)
+          copy:
+            dest: /etc/lightdm/lightdm.conf
+            content: |
+              [Seat:*]
+              {% if enable_autologin %}
+              autologin-user={{ target_user }}
+              autologin-user-timeout=0
+              {% endif %}
+              autologin-session=i3
+              user-session=i3
+              greeter-session=lightdm-gtk-greeter
+
+        - name: 🎨 Minimal i3 config (no compositor)
+          copy:
+            dest: "{{ user_home }}/.config/i3/config"
+            owner: "{{ target_user }}"
+            mode: "0644"
+            content: |
+              # i3 config - Lightweight Nord Theme 💻
+              # Compositor disabled for better performance
+              
+              set $mod Mod4
+              set $terminal {{ 'st' if total_ram_mb < 2048 else 'kitty' }}
+              set $browser {{ browser }}
+              
+              # Nord Colors
+              set $bg {{ n0 }}
+              set $bg-inactive {{ n1 }}
+              set $fg {{ n4 }}
+              set $fg-inactive {{ n5 }}
+              set $primary {{ n8 }}
+              set $primary-bg {{ n10 }}
+              set $urgent {{ n11 }}
+              
+              client.focused          $primary-bg $primary-bg $primary   $primary-bg   $primary
+              client.focused_inactive $bg-inactive $bg-inactive $fg-inactive $bg-inactive $bg-inactive
+              client.unfocused        $bg-inactive $bg-inactive $fg-inactive $bg-inactive $bg-inactive
+              client.urgent           $urgent      $urgent      $bg         $urgent       $urgent
+              
+              font pango:Monospace 10
+              
+              # Startup (no compositor for performance)
+              exec_always --no-startup-id feh --bg-scale "{{ wallpaper_path }}"
+              exec --no-startup-id $terminal
+              
+              # Basic keybindings
+              bindsym $mod+Return exec $terminal
+              bindsym $mod+d exec dmenu_run -nb "{{ n0 }}" -nf "{{ n4 }}" -sb "{{ n8 }}" -sf "{{ n0 }}"
+              bindsym $mod+Shift+q kill
+              bindsym $mod+Shift+c reload
+              bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit i3?' -b 'Yes' 'i3-msg exit'"
+              
+              # Layout management
+              bindsym $mod+h split h
+              bindsym $mod+v split v
+              bindsym $mod+f fullscreen toggle
+              bindsym $mod+s layout stacking
+              bindsym $mod+w layout tabbed
+              bindsym $mod+e layout toggle split
+              
+              # Focus management
+              bindsym $mod+Left focus left
+              bindsym $mod+Down focus down
+              bindsym $mod+Up focus up
+              bindsym $mod+Right focus right
+              
+              # Move windows
+              bindsym $mod+Shift+Left move left
+              bindsym $mod+Shift+Down move down
+              bindsym $mod+Shift+Up move up
+              bindsym $mod+Shift+Right move right
+              
+              # Workspaces
+              bindsym $mod+1 workspace 1
+              bindsym $mod+2 workspace 2
+              bindsym $mod+3 workspace 3
+              bindsym $mod+4 workspace 4
+              bindsym $mod+5 workspace 5
+              bindsym $mod+6 workspace 6
+              bindsym $mod+7 workspace 7
+              bindsym $mod+8 workspace 8
+              bindsym $mod+9 workspace 9
+              bindsym $mod+0 workspace 10
+              
+              bindsym $mod+Shift+1 move container to workspace 1
+              bindsym $mod+Shift+2 move container to workspace 2
+              bindsym $mod+Shift+3 move container to workspace 3
+              bindsym $mod+Shift+4 move container to workspace 4
+              bindsym $mod+Shift+5 move container to workspace 5
+              bindsym $mod+Shift+6 move container to workspace 6
+              bindsym $mod+Shift+7 move container to workspace 7
+              bindsym $mod+Shift+8 move container to workspace 8
+              bindsym $mod+Shift+9 move container to workspace 9
+              bindsym $mod+Shift+10 move container to workspace 10
+              
+              # Resize mode
+              mode "resize" {
+                  bindsym Left resize shrink width 10 px or 10 ppt
+                  bindsym Down resize grow height 10 px or 10 ppt
+                  bindsym Up resize shrink height 10 px or 10 ppt
+                  bindsym Right resize grow width 10 px or 10 ppt
+                  bindsym Return mode "default"
+                  bindsym Escape mode "default"
+              }
+              bindsym $mod+r mode "resize"
+              
+              {% if use_status_bar %}
+              # Lightweight status bar
+              bar {
+                  position top
+                  status_command i3status
+                  colors {
+                      background $bg
+                      statusline $fg
+                      separator $bg-inactive
+                      focused_workspace  $primary-bg $primary-bg $primary
+                      active_workspace   $bg-inactive $bg-inactive $fg-inactive
+                      inactive_workspace $bg-inactive $bg-inactive $fg-inactive
+                      urgent_workspace   $urgent $urgent $bg
+                  }
+              }
+              {% endif %}
+
+        - name: 🎨 Minimal terminal config (for st or kitty)
+          copy:
+            dest: "{{ user_home }}/.Xresources"
+            owner: "{{ target_user }}"
+            mode: "0644"
+            content: |
+              ! Nord Theme - Lightweight
+              *background: {{ n0 }}
+              *foreground: {{ n4 }}
+              *cursorColor: {{ n8 }}
+              *color0: {{ n1 }}
+              *color1: {{ n11 }}
+              *color2: {{ n14 }}
+              *color3: {{ n13 }}
+              *color4: {{ n9 }}
+              *color5: {{ n15 }}
+              *color6: {{ n8 }}
+              *color7: {{ n5 }}
+          become: false
+
+        - name: 🎨 Minimal vim config
+          copy:
+            dest: "{{ user_home }}/.vimrc"
+            owner: "{{ target_user }}"
+            mode: "0644"
+            content: |
+              syntax on
+              set number
+              set background=dark
+              colorscheme desert
+          become: false
+
+        - name: 🚀 Enabling LightDM
+          systemd:
+            name: lightdm
+            enabled: yes
+            state: started
+          when: not is_arch
+
+        - name: 🌐 Installing lightweight browser (Falkon)
+          package:
+            name: falkon
+            state: present
+          when: browser == "falkon"
+
+        - name: 🌐 Installing Firefox
+          package:
+            name: firefox
+            state: present
+          when: browser == "firefox"
+
+      when: enable_gui
+
+    # ============================================
+    # 🔋 POWER MANAGEMENT (TLP)
+    # ============================================
+    - name: 🔋 Installing TLP for battery optimization
+      block:
+        - name: Installing TLP (Debian/Ubuntu)
+          apt:
+            name: "{{ item }}"
+            state: present
+          loop:
+            - tlp
+            - tlp-rdw
+          when: is_debian
+
+        - name: Installing TLP (RedHat/Fedora)
+          dnf:
+            name: tlp
+            state: present
+          when: is_redhat
+
+        - name: Installing TLP (Arch)
+          pacman:
+            name: "{{ item }}"
+            state: present
+          loop:
+            - tlp
+            - tlp-rdw
+          when: is_arch
+
+        - name: Enabling TLP service
+          systemd:
+            name: tlp
+            enabled: yes
+            state: started
+
+        - name: Disabling systemd services that conflict with TLP
+          systemd:
+            name: "{{ item }}"
+            state: stopped
+            enabled: no
+          loop:
+            - systemd-rfkill
+            - bluetooth
+          ignore_errors: yes
+
+      when: enable_power_saving
+
+    - name: 🔋 Configuring TLP for maximum battery life
+      copy:
+        dest: /etc/tlp.conf
+        content: |
+          # TLP configuration for maximum battery life
+          TLP_ENABLE=1
+          
+          # Battery care
+          START_CHARGE_THRESH_BAT0=75
+          STOP_CHARGE_THRESH_BAT0=80
+          
+          # Power saving settings
+          CPU_SCALING_GOVERNOR_ON_AC=powersave
+          CPU_SCALING_GOVERNOR_ON_BAT=powersave
+          
+          # Disable wifi power saving for stability
+          WIFI_PWR_ON_AC=off
+          WIFI_PWR_ON_BAT=off
+          
+          # USB autosuspend
+          USB_AUTOSUSPEND=1
+          
+          # Radio devices
+          DEVICES_TO_DISABLE_ON_STARTUP="bluetooth wifi"
+          DEVICES_TO_ENABLE_ON_STARTUP=""
+          
+          # Audio power saving
+          SOUND_POWER_SAVE_ON_AC=1
+          SOUND_POWER_SAVE_ON_BAT=1
+          
+          # PCIe power management
+          PCIE_ASPM_ON_AC=default
+          PCIE_ASPM_ON_BAT=powersupersave
+      when: enable_power_saving
+
+    # ============================================
+    # 🐳 DOCKER (lightweight mode)
+    # ============================================
+    - name: 🐳 Installing Docker (minimal)
+      block:
+        - name: Installing Docker (Debian)
+          apt:
+            name: docker.io
+            state: present
+          when: is_debian
+
+        - name: Installing Docker (RedHat)
+          dnf:
+            name: docker
+            state: present
+          when: is_redhat
+
+        - name: Installing Docker (Arch)
+          pacman:
+            name: docker
+            state: present
+          when: is_arch
+
+        - name: Starting Docker
+          systemd:
+            name: docker
+            state: started
+            enabled: yes
+
+        - name: Adding user to docker group
+          user:
+            name: "{{ target_user }}"
+            groups: docker
+            append: yes
+      when: enable_docker
+
+    # ============================================
+    # 🛠️ LICHTWEIGHT MODERN CLI TOOLS
+    # ============================================
+    - name: 🛠️ Installing lightweight modern tools
+      block:
+        - name: Installing fzf
+          git:
+            repo: https://github.com/junegunn/fzf.git
+            dest: "{{ temp_dir }}/fzf"
+            version: master
+          become: false
+
+        - name: Installing fzf binary
+          shell: |
+            cd {{ temp_dir }}/fzf
+            ./install --bin
+            cp fzf {{ local_bin }}/
+          become: false
+          when: install_fzf
+
+        - name: Installing ripgrep (binary)
+          get_url:
+            url: "https://github.com/BurntSushi/ripgrep/releases/download/14.1.0/ripgrep-14.1.0-x86_64-unknown-linux-musl.tar.gz"
+            dest: "{{ temp_dir }}/ripgrep.tar.gz"
+          when: install_ripgrep
+
+        - name: Extracting ripgrep
+          unarchive:
+            src: "{{ temp_dir }}/ripgrep.tar.gz"
+            dest: "{{ temp_dir }}"
+            remote_src: yes
+          when: install_ripgrep
+
+        - name: Installing ripgrep
+          copy:
+            src: "{{ temp_dir }}/ripgrep-14.1.0-x86_64-unknown-linux-musl/rg"
+            dest: "{{ local_bin }}/rg"
+            mode: "0755"
+            remote_src: yes
+          when: install_ripgrep
+
+        - name: Installing fd
+          get_url:
+            url: "https://github.com/sharkdp/fd/releases/download/v8.7.0/fd-v8.7.0-x86_64-unknown-linux-musl.tar.gz"
+            dest: "{{ temp_dir }}/fd.tar.gz"
+          when: install_fd
+
+        - name: Extracting fd
+          unarchive:
+            src: "{{ temp_dir }}/fd.tar.gz"
+            dest: "{{ temp_dir }}"
+            remote_src: yes
+          when: install_fd
+
+        - name: Installing fd
+          copy:
+            src: "{{ temp_dir }}/fd-v8.7.0-x86_64-unknown-linux-musl/fd"
+            dest: "{{ local_bin }}/fd"
+            mode: "0755"
+            remote_src: yes
+          when: install_fd
+
+        - name: Installing bat
+          get_url:
+            url: "https://github.com/sharkdp/bat/releases/download/v0.24.0/bat-v0.24.0-x86_64-unknown-linux-musl.tar.gz"
+            dest: "{{ temp_dir }}/bat.tar.gz"
+          when: install_bat
+
+        - name: Extracting bat
+          unarchive:
+            src: "{{ temp_dir }}/bat.tar.gz"
+            dest: "{{ temp_dir }}"
+            remote_src: yes
+          when: install_bat
+
+        - name: Installing bat
+          copy:
+            src: "{{ temp_dir }}/bat-v0.24.0-x86_64-unknown-linux-musl/bat"
+            dest: "{{ local_bin }}/bat"
+            mode: "0755"
+            remote_src: yes
+          when: install_bat
+
+    # ============================================
+    # 🎨 LICHTWEIGHT SHELL CONFIGURATION
+    # ============================================
+    - name: 🎨 Creating minimal bash aliases
+      copy:
+        dest: "{{ user_home }}/.bash_aliases"
+        owner: "{{ target_user }}"
+        mode: "0644"
+        content: |
+          # Lightweight aliases for laptop 💻
+          alias ls='ls --color=auto'
+          alias ll='ls -alF'
+          alias la='ls -A'
+          
+          {% if install_bat %}alias cat='bat --paging=never'{% endif %}
+          {% if install_ripgrep %}alias grep='rg'{% endif %}
+          {% if install_fd %}alias find='fd'{% endif %}
+          alias top='htop'
+          
+          # Docker aliases (if installed)
+          {% if enable_docker %}
+          alias d='docker'
+          alias dps='docker ps'
+          alias di='docker images'
+          {% endif %}
+          
+          # Quick system updates
+          alias update='sudo apt update && sudo apt upgrade -y'
+          alias cleanup='sudo apt autoremove -y && sudo apt autoclean'
+      become: false
+
+    - name: 🎨 Adding PATH and fzf to bashrc
+      lineinfile:
+        path: "{{ user_home }}/.bashrc"
+        line: |
+          # Add local bin to PATH
+          export PATH="$HOME/.local/bin:$PATH"
+          
+          {% if install_fzf %}
+          # fzf configuration
+          if [ -f $HOME/.local/bin/fzf ]; then
+              source <(fzf --bash)
+          fi
+          {% endif %}
+          
+          # Simple Nord-inspired prompt (lightweight)
+          export PS1='\[\033[38;5;111m\]\u\[\033[38;5;67m\]@\[\033[38;5;81m\]\h\[\033[0m\]:\[\033[38;5;150m\]\w\[\033[0m\]\$ '
+          
+          # Load aliases
+          if [ -f ~/.bash_aliases ]; then
+              . ~/.bash_aliases
+          fi
+        insertafter: EOF
+      become: false
+
+    # ============================================
+    # 🧹 CLEANUP & SUMMARY
+    # ============================================
+    - name: 🧹 Cleaning up
+      file:
+        path: "{{ temp_dir }}"
+        state: absent
+
+    - name: 🎉 Lightweight installation complete
+      debug:
+        msg: |
+          ╔══════════════════════════════════════════════════════════════════╗
+          ║                                                                  ║
+          ║     💻 NORD LIGHTWEIGHT LAPTOP - SETUP COMPLETE 🎉               ║
+          ║                                                                  ║
+          ╚══════════════════════════════════════════════════════════════════╝
+          
+          ✨ Optimized for battery life and performance:
+          ────────────────────────────────────────────────────────────────────
+          🖥️  Desktop: i3 (no compositor - faster)
+          🎨 Terminal: {{ 'st (ultra-light)' if total_ram_mb < 2048 else 'kitty' }}
+          🌐 Browser: {{ browser | title }}
+          🔋 Power: TLP enabled (max battery life)
+          
+          🛠️ Lightweight Tools:
+          {% if install_fzf %}   ✅ fzf (fuzzy finder){% endif %}
+          {% if install_ripgrep %}   ✅ ripgrep (fast grep){% endif %}
+          {% if install_fd %}   ✅ fd (fast find){% endif %}
+          {% if install_bat %}   ✅ bat (better cat){% endif %}
+          
+          📊 Performance Tips:
+          ────────────────────────────────────────────────────────────────────
+          1️⃣  Compositor is disabled - better performance and battery life
+          2️⃣  TLP is active - maximizes battery runtime
+          3️⃣  Use Falkon browser for even lighter web browsing
+          4️⃣  Close unused workspaces to save RAM
+          
+          🚀 Quick Start:
+          ────────────────────────────────────────────────────────────────────
+          1️⃣  Reboot to start LightDM:
+              sudo reboot
+          
+          2️⃣  Essential i3 shortcuts:
+              🪟 Mod (Win key) + Enter → Terminal
+              🔍 Mod + d → dmenu (app launcher)
+              🔄 Mod + Shift + c → Reload i3
+              
+          3️⃣  Check battery status:
+              tlp-stat -b
+          
+          ⚡ This setup is optimized for:
+          - Maximum battery life
+          - Low memory usage (<500MB idle)
+          - Fast boot times
+          - Smooth performance on older hardware
+          
+          💡 Pro tip: If you need more performance, consider:
+          - Using Falkon instead of Firefox
+          - Disabling the status bar (edit i3 config)
+          - Reducing swappiness: echo 10 | sudo tee /proc/sys/vm/swappiness
+
+    - name: 💾 Memory usage tip
+      debug:
+        msg: |
+          📊 Estimated memory usage after reboot:
+          - i3 (window manager): ~50MB
+          - LightDM: ~30MB
+          - Terminal: ~20MB
+          - Total idle: ~150-200MB
+          
+          ✅ Perfect for laptops with 2GB RAM or less!
