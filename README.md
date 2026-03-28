@@ -39,36 +39,8 @@
 ![Nomad](https://img.shields.io/badge/Nomad-00C58E?style=flat-square&logo=nomad&logoColor=white)
 ![Vagrant](https://img.shields.io/badge/Vagrant-1563FF?style=flat-square&logo=vagrant&logoColor=white)
 
-<!-- Search & Find -->
-![fzf](https://img.shields.io/badge/fzf-2E3440?style=flat-square)
-![ripgrep](https://img.shields.io/badge/ripgrep-2E3440?style=flat-square)
-![fd](https://img.shields.io/badge/fd-2E3440?style=flat-square)
-
-<!-- Viewers -->
-![bat](https://img.shields.io/badge/bat-2E3440?style=flat-square)
-![tldr](https://img.shields.io/badge/tldr-2E3440?style=flat-square)
-![httpie](https://img.shields.io/badge/HTTPie-2E3440?style=flat-square)
-![jq](https://img.shields.io/badge/jq-2E3440?style=flat-square)
-![yq](https://img.shields.io/badge/yq-2E3440?style=flat-square)
-
 <!-- Git -->
 ![Git](https://img.shields.io/badge/Git-F05032?style=flat-square&logo=git&logoColor=white)
-![lazygit](https://img.shields.io/badge/lazygit-2E3440?style=flat-square)
-
-<!-- System Tools -->
-![htop](https://img.shields.io/badge/htop-2E3440?style=flat-square)
-![ncdu](https://img.shields.io/badge/ncdu-2E3440?style=flat-square)
-![iftop](https://img.shields.io/badge/iftop-2E3440?style=flat-square)
-![iptraf](https://img.shields.io/badge/iptraf-2E3440?style=flat-square)
-
-<!-- Network -->
-![nmap](https://img.shields.io/badge/nmap-2E3440?style=flat-square)
-![mtr](https://img.shields.io/badge/mtr-2E3440?style=flat-square)
-![tcpdump](https://img.shields.io/badge/tcpdump-2E3440?style=flat-square)
-
-<!-- Debugging -->
-![strace](https://img.shields.io/badge/strace-2E3440?style=flat-square)
-![lsof](https://img.shields.io/badge/lsof-2E3440?style=flat-square)
 
 ![TLP](https://img.shields.io/badge/TLP-2E3440?style=flat-square&logo=power-off&logoColor=white)
 ![Power Saving](https://img.shields.io/badge/Power_Saving-Enabled-2E3440?style=flat-square&logo=battery-full&logoColor=green)
