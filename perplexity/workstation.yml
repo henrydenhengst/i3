@@ -1,16 +1,14 @@
 ---
-- name: Complete Workstation Setup (i3 + Nord + DevOps)
+- name: Complete i3 + LightDM + Nord Workstation (1 script)
   hosts: localhost
   become: true
   vars:
-    # Feature flags - pas aan
     enable_gui: true
-    enable_browser: true
+    enable_browser: true  
     enable_docker: true
     enable_vagrant: false
     browser_preference: "falkon"  # falkon | firefox
 
-    # Nord colors
     nord_colors:
       bg: "#2E3440"
       fg: "#D8DEE9"
@@ -24,51 +22,47 @@
       white: "#ECEFF4"
 
   tasks:
-    # 1. Detect OS family
-    - name: Detect OS family
+    - name: Detect OS
       set_fact:
-        os_family: "{{ ansible_facts.os_family }}"
         is_debian: "{{ ansible_facts.os_family == 'Debian' }}"
         is_redhat: "{{ ansible_facts.os_family == 'RedHat' }}"
         is_arch: "{{ ansible_facts.distribution == 'Archlinux' }}"
         is_alpine: "{{ ansible_facts.distribution == 'Alpine' }}"
 
-    # 2. Update system
-    - name: Update package cache
+    - name: Update packages
       block:
-        - apt:
-            update_cache: true
-            cache_valid_time: 3600
+        - apt: update_cache=yes cache_valid_time=3600
           when: is_debian
-        - dnf:
-            update_cache: true
+        - dnf: update_cache=yes
           when: is_redhat
-        - pacman:
-            update_cache: true
+        - pacman: update_cache=yes
           when: is_arch
-        - apk:
-            update_cache: true
+        - apk: update_cache=yes
           when: is_alpine
 
-    # 3. Install X11 + core WM
-    - name: Install i3 + dmenu + kitty base
+    # CORE DESKTOP: i3 + LightDM + kitty + dmenu
+    - name: Install desktop packages
       block:
-        # Debian/Ubuntu
-        - apt:
+        - name: Debian/Ubuntu
+          apt:
             name:
               - i3
+              - lightdm
+              - lightdm-gtk-greeter
               - dmenu
               - kitty
               - feh
-              - xorg
+              - xserver-xorg
               - dbus-x11
             state: present
           when: is_debian
 
-        # RedHat/Fedora
-        - dnf:
+        - name: RedHat/Fedora  
+          dnf:
             name:
               - i3
+              - lightdm
+              - lightdm-gtk
               - dmenu
               - kitty
               - feh
@@ -77,10 +71,12 @@
             state: present
           when: is_redhat
 
-        # Arch
-        - pacman:
+        - name: Arch
+          pacman:
             name:
               - i3-wm
+              - lightdm
+              - lightdm-gtk-greeter
               - dmenu
               - kitty
               - feh
@@ -88,10 +84,12 @@
             state: present
           when: is_arch
 
-        # Alpine (CLI-only fallback)
-        - apk:
+        - name: Alpine (community repo)
+          apk:
             name:
               - i3wm
+              - lightdm
+              - lightdm-gtk-greeter
               - dmenu
               - kitty
               - feh
@@ -100,30 +98,25 @@
               - http://dl-cdn.alpinelinux.org/alpine/edge/community
             state: present
           when: is_alpine
-
       when: enable_gui
 
-    # 4. Browser
+    # BROWSER
     - name: Install browser
       block:
-        - name: Falkon
-          block:
+        - block:
             - apt: name=falkon state=present
               when: is_debian
-            - dnf: name=falkon state=present
+            - dnf: name=falkon state=present  
               when: is_redhat
             - pacman: name=falkon state=present
               when: is_arch
             - apk:
                 name=falkon
-                repositories:
-                  - http://dl-cdn.alpinelinux.org/alpine/edge/community
-                state: present
+                repositories: - http://dl-cdn.alpinelinux.org/alpine/edge/community
               when: is_alpine
           when: browser_preference == "falkon"
 
-        - name: Firefox fallback
-          block:
+        - block:
             - apt: name=firefox-esr state=present
               when: is_debian
             - dnf: name=firefox state=present
@@ -135,45 +128,35 @@
           when: browser_preference == "firefox"
       when: enable_gui and enable_browser
 
-    # 5. Docker (official)
-    - name: Install Docker
+    # DOCKER (official)
+    - name: Docker Debian
       block:
-        - name: Docker repo (Debian)
-          apt_repository:
-            repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/{{ ansible_facts.distribution|lower }} {{ ansible_facts.distribution_release }} stable"
-            state: present
-            filename: docker
-          when: is_debian
-
         - apt_key:
             url: https://download.docker.com/linux/ubuntu/gpg
             keyring: /usr/share/keyrings/docker-archive-keyring.gpg
-          when: is_debian
-
-        - name: Docker packages
-          apt:
+        - apt_repository:
+            repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu {{ ansible_facts.distribution_release }} stable"
+            state: present
+        - apt:
             name:
               - docker-ce
               - docker-ce-cli
               - containerd.io
               - docker-buildx-plugin
               - docker-compose-plugin
-            state: present
-            update_cache: true
-          when: is_debian
+            update_cache: yes
+      when: is_debian and enable_docker
 
-        # RedHat equivalent...
-        - dnf:
-            name:
-              - docker-ce
-              - docker-ce-cli
-              - containerd.io
-            state: present
-          when: is_redhat
-      when: enable_docker
+    - name: Docker RedHat/Arch/Alpine  
+      package:
+        name:
+          - docker
+          - docker-compose
+        state: present
+      when: (is_redhat or is_arch or is_alpine) and enable_docker
 
-    # 6. Nord Theme Setup
-    - name: Create config directories
+    # NORD THEME + CONFIGS
+    - name: Config dirs
       file:
         path: "{{ item }}"
         state: directory
@@ -182,87 +165,105 @@
         - ~/.config/kitty
       when: enable_gui
 
-    # 7. i3 config (Nord themed)
-    - name: i3 config
-      template:
-        src: "{{ lookup('template', 'i3_config.j2') }}"
-        dest: ~/.config/i3/config
-        mode: '0644'
-      vars:
-        nord: "{{ nord_colors }}"
-      when: enable_gui
-
-    # 8. Kitty config (Nord themed)
-    - name: Kitty config
+    - name: i3 config (Nord)
       copy:
         content: |
-          include ./current-theme.conf
-          
-          font_family      JetBrains Mono Nerd Font
-          font_size        12
-          
-          background_opacity 0.95
+          # i3 config - Nord themed
+          set $mod Mod4
           
           # Nord colors
-          background #{{ nord_colors.bg }}
-          foreground #{{ nord_colors.fg }}
-          selection_background #{{ nord_colors.blue }}
-          selection_foreground #{{ nord_colors.fg }}
+          set $bg     #2E3440
+          set $fg     #D8DEE9  
+          set $black  #3B4252
+          set $red    #BF616A
+          set $green  #A3BE8C
+          set $yellow #EBCB8B
+          set $blue   #81A1C1
+          set $cyan   #88C0D0
+
+          # bar colors
+          bar {
+              status_command i3status
+              colors {
+                  background $bg
+                  statusline $fg
+                  focused_workspace  $blue $bg $fg
+                  active_workspace   $black $bg $white
+                  inactive_workspace $black $bg $black
+                  urgent_workspace   $red $bg $red
+              }
+          }
+
+          # Wallpaper
+          exec_always --no-startup-id feh --bg-scale ~/Pictures/nord-wallpaper.png
+
+          # Keybindings
+          bindsym $mod+Return exec kitty
+          bindsym $mod+d exec dmenu_run
+          bindsym $mod+Shift+q kill
+          bindsym $mod+q kill
+          bindsym $mod+Shift+c reload
+          bindsym $mod+Shift+r restart
+          bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit i3?' -B 'Yes' 'i3-msg exit'"
           
-          cursor #{{ nord_colors.fg }}
-          cursor_text_color #{{ nord_colors.bg }}
+          # Workspaces
+          {% for i in range(1, 10) %}
+          bindsym $mod+{{ i }} workspace number {{ i }}
+          {% endfor %}
+        dest: ~/.config/i3/config
+
+    - name: Kitty config (Nord)
+      copy:
+        content: |
+          background #2E3440
+          foreground #D8DEE9
+          cursor #D8DEE9
           
-          color0  #{{ nord_colors.black }}
-          color1  #{{ nord_colors.red }}
-          color2  #{{ nord_colors.green }}
-          color3  #{{ nord_colors.yellow }}
-          color4  #{{ nord_colors.blue }}
-          color5  #{{ nord_colors.magenta }}
-          color6  #{{ nord_colors.cyan }}
-          color7  #{{ nord_colors.white }}
-          color8  #{{ nord_colors.black }}
-          color9  #{{ nord_colors.red }}
-          color10 #{{ nord_colors.green }}
-          color11 #{{ nord_colors.yellow }}
-          color12 #{{ nord_colors.blue }}
-          color13 #{{ nord_colors.magenta }}
-          color14 #{{ nord_colors.cyan }}
-          color15 #{{ nord_colors.white }}
+          # Kitty nord theme
+          color0  #3B4252
+          color1  #BF616A
+          color2  #A3BE8C
+          color3  #EBCB8B
+          color4  #81A1C1
+          color5  #B48EAD
+          color6  #88C0D0
+          color7  #ECEFF4
+          color8  #4C566A
+          color9  #BF616A
+          color10 #A3BE8C
+          color11 #EBCB8B
+          color12 #81A1C1
+          color13 #B48EAD
+          color14 #8FBCBB
+          color15 #ECEFF4
         dest: ~/.config/kitty/kitty.conf
-      when: enable_gui
 
-    # 9. Nord wallpaper (download + set)
-    - name: Download Nord wallpaper
+    - name: Nord wallpaper
       get_url:
-        url: https://github.com/arcticicestudio/nord-wallpapers/raw/master/4K/Nordic%20Landscape.png
+        url: https://raw.githubusercontent.com/arcticicestudio/nord-wallpapers/master/4K/Nordic%20Landscape.png
         dest: ~/Pictures/nord-wallpaper.png
-      when: enable_gui
 
-    # 10. i3 autostart (feh wallpaper)
-    - name: i3 autostart
-      lineinfile:
-        path: ~/.config/i3/config
-        line: 'exec_always --no-startup-id feh --bg-scale ~/Pictures/nord-wallpaper.png'
-        insertafter: EOF
-      when: enable_gui
-
-    # 11. Enable/start services
-    - systemd:
+    # SERVICES
+    - name: Enable services
+      systemd:
         name: "{{ item }}"
         enabled: true
         state: started
       loop:
+        - lightdm
         - docker
-      when: enable_docker
+      when: 
+        - enable_gui or enable_docker
+        - item == 'lightdm' or item == 'docker'
 
-    # 12. User to docker group
-    - user:
+    - name: Docker group
+      user:
         name: "{{ ansible_user }}"
         groups: docker
-        append: true
+        append: yes
       when: enable_docker
 
   handlers:
     - name: Reload i3
       shell: i3-msg reload
-      when: enable_gui
+      ignore_errors: yes
