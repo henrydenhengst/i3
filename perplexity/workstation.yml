@@ -1,0 +1,268 @@
+---
+- name: Complete Workstation Setup (i3 + Nord + DevOps)
+  hosts: localhost
+  become: true
+  vars:
+    # Feature flags - pas aan
+    enable_gui: true
+    enable_browser: true
+    enable_docker: true
+    enable_vagrant: false
+    browser_preference: "falkon"  # falkon | firefox
+
+    # Nord colors
+    nord_colors:
+      bg: "#2E3440"
+      fg: "#D8DEE9"
+      black: "#3B4252"
+      red: "#BF616A"
+      green: "#A3BE8C"
+      yellow: "#EBCB8B"
+      blue: "#81A1C1"
+      magenta: "#B48EAD"
+      cyan: "#88C0D0"
+      white: "#ECEFF4"
+
+  tasks:
+    # 1. Detect OS family
+    - name: Detect OS family
+      set_fact:
+        os_family: "{{ ansible_facts.os_family }}"
+        is_debian: "{{ ansible_facts.os_family == 'Debian' }}"
+        is_redhat: "{{ ansible_facts.os_family == 'RedHat' }}"
+        is_arch: "{{ ansible_facts.distribution == 'Archlinux' }}"
+        is_alpine: "{{ ansible_facts.distribution == 'Alpine' }}"
+
+    # 2. Update system
+    - name: Update package cache
+      block:
+        - apt:
+            update_cache: true
+            cache_valid_time: 3600
+          when: is_debian
+        - dnf:
+            update_cache: true
+          when: is_redhat
+        - pacman:
+            update_cache: true
+          when: is_arch
+        - apk:
+            update_cache: true
+          when: is_alpine
+
+    # 3. Install X11 + core WM
+    - name: Install i3 + dmenu + kitty base
+      block:
+        # Debian/Ubuntu
+        - apt:
+            name:
+              - i3
+              - dmenu
+              - kitty
+              - feh
+              - xorg
+              - dbus-x11
+            state: present
+          when: is_debian
+
+        # RedHat/Fedora
+        - dnf:
+            name:
+              - i3
+              - dmenu
+              - kitty
+              - feh
+              - xorg-x11-server-Xorg
+              - dbus-x11
+            state: present
+          when: is_redhat
+
+        # Arch
+        - pacman:
+            name:
+              - i3-wm
+              - dmenu
+              - kitty
+              - feh
+              - xorg
+            state: present
+          when: is_arch
+
+        # Alpine (CLI-only fallback)
+        - apk:
+            name:
+              - i3wm
+              - dmenu
+              - kitty
+              - feh
+              - dbus
+            repositories:
+              - http://dl-cdn.alpinelinux.org/alpine/edge/community
+            state: present
+          when: is_alpine
+
+      when: enable_gui
+
+    # 4. Browser
+    - name: Install browser
+      block:
+        - name: Falkon
+          block:
+            - apt: name=falkon state=present
+              when: is_debian
+            - dnf: name=falkon state=present
+              when: is_redhat
+            - pacman: name=falkon state=present
+              when: is_arch
+            - apk:
+                name=falkon
+                repositories:
+                  - http://dl-cdn.alpinelinux.org/alpine/edge/community
+                state: present
+              when: is_alpine
+          when: browser_preference == "falkon"
+
+        - name: Firefox fallback
+          block:
+            - apt: name=firefox-esr state=present
+              when: is_debian
+            - dnf: name=firefox state=present
+              when: is_redhat
+            - pacman: name=firefox state=present
+              when: is_arch
+            - apk: name=firefox state=present
+              when: is_alpine
+          when: browser_preference == "firefox"
+      when: enable_gui and enable_browser
+
+    # 5. Docker (official)
+    - name: Install Docker
+      block:
+        - name: Docker repo (Debian)
+          apt_repository:
+            repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/{{ ansible_facts.distribution|lower }} {{ ansible_facts.distribution_release }} stable"
+            state: present
+            filename: docker
+          when: is_debian
+
+        - apt_key:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            keyring: /usr/share/keyrings/docker-archive-keyring.gpg
+          when: is_debian
+
+        - name: Docker packages
+          apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-buildx-plugin
+              - docker-compose-plugin
+            state: present
+            update_cache: true
+          when: is_debian
+
+        # RedHat equivalent...
+        - dnf:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+            state: present
+          when: is_redhat
+      when: enable_docker
+
+    # 6. Nord Theme Setup
+    - name: Create config directories
+      file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - ~/.config/i3
+        - ~/.config/kitty
+      when: enable_gui
+
+    # 7. i3 config (Nord themed)
+    - name: i3 config
+      template:
+        src: "{{ lookup('template', 'i3_config.j2') }}"
+        dest: ~/.config/i3/config
+        mode: '0644'
+      vars:
+        nord: "{{ nord_colors }}"
+      when: enable_gui
+
+    # 8. Kitty config (Nord themed)
+    - name: Kitty config
+      copy:
+        content: |
+          include ./current-theme.conf
+          
+          font_family      JetBrains Mono Nerd Font
+          font_size        12
+          
+          background_opacity 0.95
+          
+          # Nord colors
+          background #{{ nord_colors.bg }}
+          foreground #{{ nord_colors.fg }}
+          selection_background #{{ nord_colors.blue }}
+          selection_foreground #{{ nord_colors.fg }}
+          
+          cursor #{{ nord_colors.fg }}
+          cursor_text_color #{{ nord_colors.bg }}
+          
+          color0  #{{ nord_colors.black }}
+          color1  #{{ nord_colors.red }}
+          color2  #{{ nord_colors.green }}
+          color3  #{{ nord_colors.yellow }}
+          color4  #{{ nord_colors.blue }}
+          color5  #{{ nord_colors.magenta }}
+          color6  #{{ nord_colors.cyan }}
+          color7  #{{ nord_colors.white }}
+          color8  #{{ nord_colors.black }}
+          color9  #{{ nord_colors.red }}
+          color10 #{{ nord_colors.green }}
+          color11 #{{ nord_colors.yellow }}
+          color12 #{{ nord_colors.blue }}
+          color13 #{{ nord_colors.magenta }}
+          color14 #{{ nord_colors.cyan }}
+          color15 #{{ nord_colors.white }}
+        dest: ~/.config/kitty/kitty.conf
+      when: enable_gui
+
+    # 9. Nord wallpaper (download + set)
+    - name: Download Nord wallpaper
+      get_url:
+        url: https://github.com/arcticicestudio/nord-wallpapers/raw/master/4K/Nordic%20Landscape.png
+        dest: ~/Pictures/nord-wallpaper.png
+      when: enable_gui
+
+    # 10. i3 autostart (feh wallpaper)
+    - name: i3 autostart
+      lineinfile:
+        path: ~/.config/i3/config
+        line: 'exec_always --no-startup-id feh --bg-scale ~/Pictures/nord-wallpaper.png'
+        insertafter: EOF
+      when: enable_gui
+
+    # 11. Enable/start services
+    - systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - docker
+      when: enable_docker
+
+    # 12. User to docker group
+    - user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: true
+      when: enable_docker
+
+  handlers:
+    - name: Reload i3
+      shell: i3-msg reload
+      when: enable_gui
