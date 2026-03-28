@@ -42,9 +42,6 @@
 <!-- Git -->
 ![Git](https://img.shields.io/badge/Git-F05032?style=flat-square&logo=git&logoColor=white)
 
-![TLP](https://img.shields.io/badge/TLP-2E3440?style=flat-square&logo=power-off&logoColor=white)
-![Power Saving](https://img.shields.io/badge/Power_Saving-Enabled-2E3440?style=flat-square&logo=battery-full&logoColor=green)
-
 <!-- Build & Status -->
 ![Ansible](https://img.shields.io/badge/Ansible-EE0000?style=for-the-badge&logo=ansible&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
