@@ -1,0 +1,281 @@
+---
+- name: LIGHTWEIGHT i3 + LightDM + Nord LAPTOP (Minimal)
+  hosts: localhost
+  become: true
+  vars:
+    enable_gui: true
+    enable_browser: true
+    enable_light_devops: true  # Alleen essentials
+    laptop_mode: true
+    browser_choice: "falkon"
+
+    username: "{{ ansible_user }}"
+    userhome: "{{ ansible_env.HOME }}"
+
+  tasks:
+    - name: OS detectie
+      set_fact:
+        is_debian: "{{ ansible_facts.os_family == 'Debian' }}"
+        is_redhat: "{{ ansible_facts.os_family == 'RedHat' }}"
+        is_arch: "{{ ansible_facts.distribution == 'Archlinux' }}"
+        is_alpine: "{{ ansible_facts.distribution == 'Alpine' }}"
+
+    - name: Update
+      block:
+        - apt: update_cache=yes cache_valid_time=3600
+          when: is_debian
+        - dnf: update_cache=yes
+          when: is_redhat
+        - pacman: update_cache=yes
+          when: is_arch
+        - apk: update_cache=yes
+          when: is_alpine
+
+    ########################################
+    # LAPTOP GUI: LightDM + i3 + Kitty ONLY
+    ########################################
+    - name: Minimal GUI (geen zware deps)
+      block:
+        - name: DEBIAN LAPTOP
+          apt:
+            name:
+              - i3
+              - lightdm
+              - lightdm-gtk-greeter
+              - dmenu
+              - kitty
+              - feh
+              - xserver-xorg-video-all  # Laptop graphics
+              - dbus-x11
+              - ttf-dejavu              # Light fonts
+            state: present
+          when: is_debian
+
+        - name: REDHAT LAPTOP
+          dnf:
+            name:
+              - i3
+              - lightdm
+              - lightdm-gtk
+              - dmenu
+              - kitty
+              - feh
+              - xorg-x11-drv-video-vesa
+            state: present
+          when: is_redhat
+
+        - name: ARCH LAPTOP
+          pacman:
+            name:
+              - i3-wm
+              - lightdm
+              - lightdm-gtk-greeter
+              - dmenu
+              - kitty
+              - feh
+              - xf86-video-vesa
+            state: present
+          when: is_arch
+
+        - name: ALPINE LAPTOP
+          apk:
+            name:
+              - i3wm
+              - lightdm
+              - lightdm-gtk-greeter
+              - dmenu
+              - kitty
+              - feh
+              - xf86-video-fbdev
+            repositories: - http://dl-cdn.alpinelinux.org/alpine/edge/community
+            state: present
+          when: is_alpine
+      when: enable_gui
+
+    # LIGHT BROWSER
+    - name: Light browser
+      block:
+        - package:
+            name: "{{ 'falkon' if browser_choice == 'falkon' else 'firefox-esr' }}"
+            state: present
+          when: is_debian or is_redhat or is_arch
+        - apk:
+            name: "{{ 'falkon' if browser_choice == 'falkon' else 'firefox' }}"
+            repositories: - http://dl-cdn.alpinelinux.org/alpine/edge/community
+            state: present
+          when: is_alpine
+      when: enable_gui and enable_browser
+
+    ########################################
+    # LIGHT DEVOPS (alleen must-haves)     #
+    ########################################
+    - name: Laptop essentials ONLY
+      block:
+        - package:
+            name:
+              - git
+              - curl
+              - htop
+              - kitty  # terminal
+              - vim    # light editor
+            state: present
+          when: is_debian or is_redhat or is_arch
+        - apk:
+            name: git curl htop vim kitty
+            state: present
+          when: is_alpine
+      when: enable_light_devops
+
+    ########################################
+    # LAPTOP NORD + POWER USER UX          #
+    ########################################
+    - name: Lightweight perfect setup
+      block:
+        # DIRS
+        - file:
+            path: "{{ item }}"
+            state: directory
+          loop:
+            - "{{ userhome }}/.config/i3"
+            - "{{ userhome }}/.config/kitty"
+            - "{{ userhome }}/Pictures"
+
+        # i3 LAPTOP CONFIG (battery + laptop keys)
+        - name: i3 laptop config
+          copy:
+            content: |
+              # ════════════════════════════════════════════════
+              # LIGHTWEIGHT i3 LAPTOP + NORD ({{ username }})
+              # ════════════════════════════════════════════════
+              
+              set $mod Mod4
+              
+              # NORD MINIMAL
+              set $bg #2E3440
+              set $fg #D8DEE9
+              set $blue #81A1C1
+              
+              bar {
+                  status_command i3status
+                  position top
+                  colors {
+                      background $bg
+                      statusline $fg
+                      separator $bg
+                      focused_workspace $bg $blue $fg
+                      active_workspace $bg $bg $fg
+                      inactive_workspace $bg $bg $bg
+                  }
+              }
+              
+              # WALLPAPER
+              exec_always feh --bg-scale {{ userhome }}/Pictures/nord-wallpaper.png
+              
+              # ESSENTIAL SHORTCUTS (laptop focus)
+              bindsym $mod+Return exec kitty
+              bindsym $mod+d exec dmenu_run -i -p "🚀 "
+              
+              # BROWSER
+              bindsym $mod+b exec {{ 'falkon' if browser_choice == 'falkon' else 'firefox' }}
+              
+              # WORKSPACES (1-6 laptop)
+              {% for i in range(1,7) %}
+              bindsym $mod+{{ i }} workspace {{ i }}
+              {% endfor %}
+              
+              # NAVIGATIE (hjkl vim-style)
+              bindsym $mod+h focus left
+              bindsym $mod+j focus down
+              bindsym $mod+k focus up
+              bindsym $mod+l focus right
+              
+              # CLOSE
+              bindsym $mod+Shift+q kill
+              
+              # LAPTOP SPECIALS
+              bindsym XF86MonBrightnessDown exec brightnessctl s 10%-
+              bindsym XF86MonBrightnessUp exec brightnessctl s +10%
+              bindsym XF86AudioRaiseVolume exec pactl set-sink-volume @DEFAULT_SINK@ +5%
+              bindsym XF86AudioLowerVolume exec pactl set-sink-volume @DEFAULT_SINK@ -5%
+              bindsym XF86AudioMute exec pactl set-sink-mute @DEFAULT_SINK@ toggle
+              
+              # i3
+              bindsym $mod+Shift+c reload
+              bindsym $mod+Shift+r restart
+              bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit?' -B 'Yes' 'i3-msg exit'"
+            dest: "{{ userhome }}/.config/i3/config"
+
+        # KITTY LIGHTWEIGHT
+        - name: Kitty minimal
+          copy:
+            content: |
+              # Lightweight Kitty + Nord
+              font_family DejaVuSansMono
+              font_size 12
+              
+              background_opacity 0.95
+              
+              # Nord 16
+              background #2E3440
+              foreground #D8DEE9
+              cursor #D8DEE9
+              
+              color0  #3B4252
+              color8  #4C566A
+              color1  #BF616A
+              color9  #BF616A
+              color2  #A3BE8C
+              color10 #A3BE8C
+              color3  #EBCB8B
+              color11 #EBCB8B
+              color4  #81A1C1
+              color12 #81A1C1
+              color5  #B48EAD
+              color13 #B48EAD
+              color6  #88C0D0
+              color14 #8FBCBB
+              color7  #ECEFF4
+              color15 #ECEFF4
+            dest: "{{ userhome }}/.config/kitty/kitty.conf"
+
+        # WALLPAPER
+        - get_url:
+            url: https://raw.githubusercontent.com/arcticicestudio/nord-wallpapers/master/2K/Nordic%20Landscape.png
+            dest: "{{ userhome }}/Pictures/nord-wallpaper.png"
+
+        # ZSH LIGHT (geen oh-my-zsh bloat)
+        - copy:
+            content: |
+              # Lightweight zshrc
+              autoload -Uz compinit && compinit
+              
+              # Aliases
+              alias ll='ls -alF'
+              alias la='ls -A'
+              alias ..='cd ..'
+              alias c='clear'
+              
+              # Git
+              alias ga='git add .'
+              alias gc='git commit -am'
+              alias gp='git push'
+            dest: "{{ userhome }}/.zshrc"
+          when: ansible_facts.shell_type == "sh"
+
+      become_user: "{{ username }}"
+      when: enable_gui
+
+    ########################################
+    # SERVICES (minimal)                   #
+    ########################################
+    - name: LightDM only
+      systemd:
+        name: lightdm
+        enabled: true
+        state: started
+      when: enable_gui
+
+  handlers:
+    - name: i3 reload
+      shell: i3-msg reload
+      ignore_errors: yes
