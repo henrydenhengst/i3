@@ -1,0 +1,60 @@
+# 1. Maak de rol mappenstructuur
+mkdir -p roles/devops_stack/tasks
+
+# 2. Maak het aparte playbook
+cat <<EOF > devops_tools.yml
+---
+- name: Install Official DevOps CLI Stack
+  hosts: workstation
+  become: true
+  roles:
+    - devops_stack
+EOF
+
+# 3. Maak de installatie logica (Agnostisch voor Debian/RHEL/Arch)
+cat <<EOF > roles/devops_stack/tasks/main.yml
+---
+- name: Install prerequisites
+  package:
+    name: [gpg, gnupg, software-properties-common, curl, unzip]
+    state: present
+
+- name: Setup HashiCorp Stack (Terraform & Packer)
+  shell: |
+    curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg || true
+    echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com \$(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
+    apt-get update && apt-get install -y terraform packer
+  when: ansible_os_family == "Debian"
+  args: { creates: /usr/bin/terraform }
+
+- name: Setup HashiCorp Stack (RedHat)
+  shell: |
+    yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+    yum -y install terraform packer
+  when: ansible_os_family == "RedHat"
+  args: { creates: /usr/bin/terraform }
+
+- name: Install Kubernetes CLI (kubectl)
+  get_url:
+    url: "https://dl.k8s.io/release/{{ lookup('pipe', 'curl -L -s https://dl.k8s.io/release/stable.txt') }}/bin/linux/amd64/kubectl"
+    dest: /usr/local/bin/kubectl
+    mode: '0755'
+
+- name: Install Helm (Kubernetes Package Manager)
+  shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  args: { creates: /usr/local/bin/helm }
+
+- name: Install Azure CLI & AWS CLI (Generic)
+  package:
+    name: 
+      - "{{ 'azure-cli' if ansible_os_family == 'Debian' else 'azure-cli' }}"
+      - awscli
+    state: present
+  ignore_errors: yes
+
+- name: Install K9s (TUI for Kubernetes)
+  shell: curl -sS https://webinstall.dev/k9s | bash
+  args: { creates: ~/.local/bin/k9s }
+EOF
+
+echo "DevOps playbook aangemaakt: devops_tools.yml"
