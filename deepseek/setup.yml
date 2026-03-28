@@ -1,0 +1,455 @@
+---
+- name: Nord Themed Minimal Setup (i3 + dmenu)
+  hosts: localhost
+  connection: local
+  become: true
+  vars:
+    # === CONFIGUREER HIER ===
+    target_user: "{{ ansible_user_id }}"
+    enable_gui: true
+    enable_docker: true
+    enable_vagrant: false
+    browser: "firefox"  # of "falkon"
+    # =======================
+    
+    # Nord kleuren
+    n0: "#2E3440"
+    n1: "#3B4252"
+    n2: "#434C5E"
+    n3: "#4C566A"
+    n4: "#D8DEE9"
+    n5: "#E5E9F0"
+    n6: "#ECEFF4"
+    n7: "#8FBCBB"
+    n8: "#88C0D0"
+    n9: "#81A1C1"
+    n10: "#5E81AC"
+    n11: "#BF616A"
+    n12: "#D08770"
+    n13: "#EBCB8B"
+    n14: "#A3BE8C"
+    n15: "#B48EAD"
+    
+    user_home: "/home/{{ target_user }}"
+    wallpaper_url: "https://raw.githubusercontent.com/nordtheme/assets/main/wallpapers/mountains/everforest.png"
+    wallpaper_path: "{{ user_home }}/.local/share/wallpapers/nord.png"
+
+  tasks:
+    - name: Detect OS
+      set_fact:
+        is_debian: "{{ ansible_os_family == 'Debian' }}"
+        is_redhat: "{{ ansible_os_family == 'RedHat' }}"
+        is_arch: "{{ ansible_distribution == 'Archlinux' }}"
+        is_alpine: "{{ ansible_os_family == 'Alpine' }}"
+
+    - name: Update cache
+      package:
+        update_cache: yes
+      when: not is_arch  # Arch updatet tijdens installatie
+
+    # ============================================
+    # 1. BASIS PAKKETTEN
+    # ============================================
+    - name: Install base packages
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - curl
+        - wget
+        - git
+        - vim
+        - htop
+        - tmux
+        - unzip
+        - feh
+        - picom
+        - dunst
+        - kitty
+
+    # ============================================
+    # 2. WINDOW MANAGER (i3 + dmenu)
+    # ============================================
+    - name: Install i3 and dmenu
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - i3-wm
+        - i3status
+        - i3lock
+        - dmenu
+        - lightdm
+      when: enable_gui and not is_alpine
+
+    - name: Install for Alpine (different names)
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - i3wm
+        - i3status
+        - i3lock
+        - dmenu
+        - lightdm
+      when: enable_gui and is_alpine
+
+    - name: Install X11 for Debian/RedHat
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - xorg
+        - xinit
+      when: enable_gui and (is_debian or is_redhat)
+
+    - name: Install X11 for Arch
+      package:
+        name: xorg
+        state: present
+      when: enable_gui and is_arch
+
+    # ============================================
+    # 3. NORD THEMA
+    # ============================================
+    - name: Create directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ target_user }}"
+        mode: "0755"
+      loop:
+        - "{{ user_home }}/.config/i3"
+        - "{{ user_home }}/.config/kitty"
+        - "{{ user_home }}/.local/share/wallpapers"
+        - "{{ user_home }}/.local/bin"
+
+    - name: Download Nord wallpaper
+      get_url:
+        url: "{{ wallpaper_url }}"
+        dest: "{{ wallpaper_path }}"
+        owner: "{{ target_user }}"
+        mode: "0644"
+      become: false
+      when: enable_gui
+
+    - name: i3 config with Nord theme
+      copy:
+        dest: "{{ user_home }}/.config/i3/config"
+        owner: "{{ target_user }}"
+        mode: "0644"
+        content: |
+          # i3 config - Nord theme
+          set $mod Mod4
+          set $terminal kitty
+          set $browser {{ browser }}
+          
+          # Nord colors
+          set $bg {{ n0 }}
+          set $bg-inactive {{ n1 }}
+          set $fg {{ n4 }}
+          set $fg-inactive {{ n5 }}
+          set $primary {{ n8 }}
+          set $primary-bg {{ n10 }}
+          set $urgent {{ n11 }}
+          
+          client.focused          $primary-bg $primary-bg $primary   $primary-bg   $primary
+          client.focused_inactive $bg-inactive $bg-inactive $fg-inactive $bg-inactive $bg-inactive
+          client.unfocused        $bg-inactive $bg-inactive $fg-inactive $bg-inactive $bg-inactive
+          client.urgent           $urgent      $urgent      $bg         $urgent       $urgent
+          
+          font pango:Monospace 10
+          
+          exec_always --no-startup-id feh --bg-scale "{{ wallpaper_path }}"
+          exec_always --no-startup-id picom -b
+          exec --no-startup-id kitty
+          
+          bindsym $mod+Return exec $terminal
+          bindsym $mod+d exec dmenu_run -nb "{{ n0 }}" -nf "{{ n4 }}" -sb "{{ n8 }}" -sf "{{ n0 }}"
+          bindsym $mod+Shift+q kill
+          bindsym $mod+Shift+c reload
+          bindsym $mod+Shift+e exec "i3-nagbar -t warning -m 'Exit?' -b 'Yes' 'i3-msg exit'"
+          
+          bindsym $mod+h split h
+          bindsym $mod+v split v
+          bindsym $mod+f fullscreen toggle
+          bindsym $mod+s layout stacking
+          bindsym $mod+w layout tabbed
+          bindsym $mod+e layout toggle split
+          
+          bindsym $mod+Left focus left
+          bindsym $mod+Down focus down
+          bindsym $mod+Up focus up
+          bindsym $mod+Right focus right
+          
+          bindsym $mod+Shift+Left move left
+          bindsym $mod+Shift+Down move down
+          bindsym $mod+Shift+Up move up
+          bindsym $mod+Shift+Right move right
+          
+          bindsym $mod+1 workspace 1
+          bindsym $mod+2 workspace 2
+          bindsym $mod+3 workspace 3
+          bindsym $mod+4 workspace 4
+          bindsym $mod+5 workspace 5
+          bindsym $mod+6 workspace 6
+          bindsym $mod+7 workspace 7
+          bindsym $mod+8 workspace 8
+          bindsym $mod+9 workspace 9
+          bindsym $mod+0 workspace 10
+          
+          bindsym $mod+Shift+1 move container to workspace 1
+          bindsym $mod+Shift+2 move container to workspace 2
+          bindsym $mod+Shift+3 move container to workspace 3
+          bindsym $mod+Shift+4 move container to workspace 4
+          bindsym $mod+Shift+5 move container to workspace 5
+          bindsym $mod+Shift+6 move container to workspace 6
+          bindsym $mod+Shift+7 move container to workspace 7
+          bindsym $mod+Shift+8 move container to workspace 8
+          bindsym $mod+Shift+9 move container to workspace 9
+          bindsym $mod+Shift+10 move container to workspace 10
+          
+          mode "resize" {
+                  bindsym Left resize shrink width 10 px or 10 ppt
+                  bindsym Down resize grow height 10 px or 10 ppt
+                  bindsym Up resize shrink height 10 px or 10 ppt
+                  bindsym Right resize grow width 10 px or 10 ppt
+                  bindsym Return mode "default"
+                  bindsym Escape mode "default"
+          }
+          bindsym $mod+r mode "resize"
+          
+          bar {
+                  position top
+                  status_command i3status
+                  colors {
+                          background $bg
+                          statusline $fg
+                          separator $bg-inactive
+                          focused_workspace  $primary-bg $primary-bg $primary
+                          active_workspace   $bg-inactive $bg-inactive $fg-inactive
+                          inactive_workspace $bg-inactive $bg-inactive $fg-inactive
+                          urgent_workspace   $urgent $urgent $bg
+                  }
+          }
+      when: enable_gui
+
+    - name: Kitty config with Nord theme
+      copy:
+        dest: "{{ user_home }}/.config/kitty/kitty.conf"
+        owner: "{{ target_user }}"
+        mode: "0644"
+        content: |
+          # Kitty - Nord theme
+          font_size 12
+          font_family monospace
+          
+          background {{ n0 }}
+          foreground {{ n4 }}
+          selection_background {{ n4 }}
+          selection_foreground {{ n0 }}
+          
+          color0 {{ n1 }}
+          color1 {{ n11 }}
+          color2 {{ n14 }}
+          color3 {{ n13 }}
+          color4 {{ n9 }}
+          color5 {{ n15 }}
+          color6 {{ n8 }}
+          color7 {{ n5 }}
+          color8 {{ n3 }}
+          color9 {{ n11 }}
+          color10 {{ n14 }}
+          color11 {{ n13 }}
+          color12 {{ n9 }}
+          color13 {{ n15 }}
+          color14 {{ n7 }}
+          color15 {{ n6 }}
+          
+          cursor {{ n8 }}
+          cursor_text_color {{ n0 }}
+      become: false
+
+    - name: Xresources for terminal colors
+      copy:
+        dest: "{{ user_home }}/.Xresources"
+        owner: "{{ target_user }}"
+        mode: "0644"
+        content: |
+          ! Nord theme for Xresources
+          *background: {{ n0 }}
+          *foreground: {{ n4 }}
+          *cursorColor: {{ n8 }}
+          *color0: {{ n1 }}
+          *color1: {{ n11 }}
+          *color2: {{ n14 }}
+          *color3: {{ n13 }}
+          *color4: {{ n9 }}
+          *color5: {{ n15 }}
+          *color6: {{ n8 }}
+          *color7: {{ n5 }}
+          *color8: {{ n3 }}
+          *color9: {{ n11 }}
+          *color10: {{ n14 }}
+          *color11: {{ n13 }}
+          *color12: {{ n9 }}
+          *color13: {{ n15 }}
+          *color14: {{ n7 }}
+          *color15: {{ n6 }}
+      become: false
+
+    - name: Vim config
+      copy:
+        dest: "{{ user_home }}/.vimrc"
+        owner: "{{ target_user }}"
+        mode: "0644"
+        content: |
+          syntax on
+          set number
+          set background=dark
+          colorscheme desert
+      become: false
+
+    - name: Tmux config
+      copy:
+        dest: "{{ user_home }}/.tmux.conf"
+        owner: "{{ target_user }}"
+        mode: "0644"
+        content: |
+          set -g status-bg colour235
+          set -g status-fg colour250
+          set -g status-left '#[fg=green]#H'
+          set -g status-right '#[fg=yellow]#(uptime | cut -d " " -f 4-5)'
+      become: false
+
+    # ============================================
+    # 4. BROWSER
+    # ============================================
+    - name: Install Firefox
+      package:
+        name: "{{ 'firefox' if not is_alpine else 'firefox-esr' }}"
+        state: present
+      when: enable_gui and browser == "firefox"
+
+    - name: Install Falkon
+      package:
+        name: falkon
+        state: present
+      when: enable_gui and browser == "falkon"
+
+    # ============================================
+    # 5. DEVOPS STACK (officiële bronnen)
+    # ============================================
+    - name: Install Docker (official)
+      block:
+        - name: Add Docker repo Debian
+          shell: |
+            curl -fsSL https://download.docker.com/linux/{{ ansible_distribution|lower }}/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/{{ ansible_distribution|lower }} {{ ansible_distribution_release }} stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          when: is_debian
+          
+        - name: Install Docker Debian
+          apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-compose-plugin
+            state: present
+          when: is_debian
+          
+        - name: Add Docker repo RedHat
+          get_url:
+            url: https://download.docker.com/linux/centos/docker-ce.repo
+            dest: /etc/yum.repos.d/docker-ce.repo
+          when: is_redhat
+          
+        - name: Install Docker RedHat
+          dnf:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-compose-plugin
+            state: present
+          when: is_redhat
+          
+        - name: Install Docker Arch
+          pacman:
+            name:
+              - docker
+              - docker-compose
+            state: present
+          when: is_arch
+          
+        - name: Start Docker
+          systemd:
+            name: docker
+            state: started
+            enabled: yes
+            
+        - name: Add user to docker group
+          user:
+            name: "{{ target_user }}"
+            groups: docker
+            append: yes
+      when: enable_docker
+
+    - name: Install Vagrant
+      block:
+        - name: Download Vagrant
+          get_url:
+            url: https://releases.hashicorp.com/vagrant/2.3.4/vagrant_2.3.4_linux_amd64.zip
+            dest: /tmp/vagrant.zip
+          when: not is_arch and not is_alpine
+          
+        - name: Extract Vagrant
+          unarchive:
+            src: /tmp/vagrant.zip
+            dest: /usr/local/bin
+            remote_src: yes
+          when: not is_arch and not is_alpine
+          
+        - name: Install Vagrant Arch
+          pacman:
+            name: vagrant
+            state: present
+          when: is_arch
+          
+        - name: Install Vagrant Alpine
+          apk:
+            name: vagrant
+            state: present
+          when: is_alpine
+      when: enable_vagrant
+
+    # ============================================
+    # 6. AFMELDING
+    # ============================================
+    - name: Apply Xresources
+      shell: xrdb -merge {{ user_home }}/.Xresources
+      become: false
+      ignore_errors: yes
+
+    - name: Done
+      debug:
+        msg: |
+          
+          ✅ Installatie voltooid!
+          
+          Wat er is geïnstalleerd:
+          - i3 + dmenu (window manager)
+          - Kitty terminal (Nord theme)
+          - Browser: {{ browser }}
+          - Docker: {{ 'ja' if enable_docker else 'nee' }}
+          - Vagrant: {{ 'ja' if enable_vagrant else 'nee' }}
+          
+          🔧 Gebruik:
+          - Inloggen: kies "i3" bij de login manager
+          - Of typ: startx (na inloggen in console)
+          
+          🎨 Shortcuts:
+          - Mod (Windows-toets) + Enter = terminal
+          - Mod + d = dmenu (app launcher)
+          - Mod + Shift + c = herlaad i3 config
+          - Mod + Shift + e = exit i3
